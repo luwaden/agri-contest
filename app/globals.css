@@ -1,0 +1,74 @@
+@import "@fontsource-variable/inter/index.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Elza: add licensed files to /public/fonts and list them here. Until then Inter (the guide's fallback) is used. */
+@font-face { font-family: "Elza"; font-weight: 400; font-display: swap; src: local("Elza Regular"), local("Elza-Regular"); }
+@font-face { font-family: "Elza"; font-weight: 600; font-display: swap; src: local("Elza Semibold"), local("Elza-Semibold"); }
+@font-face { font-family: "Elza"; font-weight: 700; font-display: swap; src: local("Elza Bold"), local("Elza-Bold"); }
+@font-face { font-family: "Elza"; font-weight: 800; font-display: swap; src: local("Elza ExtraBold"), local("Elza-ExtraBold"); }
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { @apply bg-white text-ink font-sans antialiased; font-feature-settings: "ss01", "cv11"; }
+  /* Brand type rules: headers Bold/ExtraBold at -40 tracking, sub-headers SemiBold at -20, body Regular at 0. */
+  h1, h2 { @apply font-extrabold text-leaf-700; letter-spacing: -0.04em; }
+  h3, h4 { @apply font-semibold text-forest-900; letter-spacing: -0.02em; }
+  :focus-visible { @apply outline-none ring-2 ring-offset-2 ring-brand-blue; }
+  ::selection { background: #c3e9b4; }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  }
+}
+
+@layer components {
+  .container-page { @apply mx-auto w-full max-w-6xl px-5 sm:px-8; }
+  .eyebrow { @apply inline-flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.14em] text-leaf-700; }
+  .eyebrow::before { content: ""; width: 30px; height: 4px; border-radius: 2px; background: linear-gradient(90deg,#005937 0 34%,#0872b9 34% 67%,#ee6a24 67% 100%); }
+  .input-base {
+    @apply block w-full rounded-md border border-neutral-300 bg-white px-3.5 py-3 text-base text-ink placeholder:text-ink-muted/70
+           transition-colors hover:border-neutral-400 focus:border-leaf-600 focus:outline-none focus:ring-2 focus:ring-leaf-600/25;
+  }
+  .input-error { @apply border-danger-fg/70 focus:border-danger-fg focus:ring-danger-fg/20; }
+  .skeleton { @apply relative overflow-hidden rounded bg-neutral-200/70; }
+  .skeleton::after { content: ""; @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent; animation: shimmer 1.4s infinite; }
+}
+
+@media print {
+  header, footer, .no-print { display: none !important; }
+  body { background: white; }
+  .print-page { padding: 0 !important; max-width: 100% !important; }
+}
+
+/* ── Motion: restrained, transform/opacity only ── */
+@layer utilities {
+  .sway { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 6.5s ease-in-out infinite; }
+  .sway-slow { animation-duration: 10s; }
+  .breathe { animation: breathe 9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .drift { animation: drift 40s linear infinite alternate; }
+  .reveal-init { opacity: 0; transform: translateY(18px); }
+  .reveal-init.in { opacity: 1; transform: none; transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0ms); }
+  .zoom-art { transition: transform 1.2s cubic-bezier(.2,.7,.2,1); }
+  .group:hover .zoom-art { transform: scale(1.06); }
+  .draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .in .draw, .draw.in { stroke-dashoffset: 0; transition: stroke-dashoffset 1.6s ease-out .2s; }
+}
+@keyframes sway { 0%,100% { transform: rotate(-2.6deg); } 35% { transform: rotate(1.2deg); } 60% { transform: rotate(3.4deg); } }
+@keyframes breathe { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.06); opacity: 1; } }
+@keyframes drift { from { transform: translateX(-2%); } to { transform: translateX(2%); } }
+
+/* ── Flyer-inspired patterns ── */
+@layer utilities {
+  .grid-bg { background-image: linear-gradient(rgba(0,89,55,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(0,89,55,.055) 1px, transparent 1px); background-size: 30px 30px; }
+  .dash-line { border-top: 2px dashed rgba(0,89,55,.35); }
+  .dash-line-light { border-top: 2px dashed rgba(255,255,255,.35); }
+  .bubble { position: relative; }
+  .bubble::after { content: ""; position: absolute; left: 1.6rem; bottom: -7px; width: 16px; height: 16px; background: inherit; transform: rotate(45deg); border-radius: 3px; }
+  .outline-sticker { -webkit-text-stroke: 10px #fff; paint-order: stroke fill; }
+}
+
+/* Brand type: display text is Bold/ExtraBold with tight tracking (-40). Headings default to the same rule. */
+@layer components {
+  .font-display { font-weight: 800; letter-spacing: -0.04em; }
+}
