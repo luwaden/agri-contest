@@ -117,7 +117,7 @@ export function HowItWorks() {
     ["Apply", "Three short stages online. Save and continue any time.", "yellow"],
     ["Screening", "The strongest applications are shortlisted to a Top 100.", "green"],
     ["Pitch", "Shortlisted applicants pitch to reach the Top 30.", "blue"],
-    ["Grand Finale", "A live final and Deal Room on Thursday 10 December 2026 selects ten winners.", "primary"],
+    ["Grand Finale", `A live final and Deal Room (${TIMELINE[4].date}) selects ten winners.`, "primary"],
   ];
   return (
     <ProgrammeSection id="how-it-works" eyebrow="How it works" title="From application to award.">
@@ -146,12 +146,12 @@ export function MentorCTA() {
         <Reveal>
           <div className="relative grid items-center gap-6 overflow-hidden rounded-[1.75rem] bg-azure p-7 text-white sm:p-10 lg:grid-cols-[1.4fr_1fr]">
             <div>
-              <p className="eyebrow !text-sun">Call for mentors</p>
-              <h2 className="mt-3 font-display text-display-lg !text-white">Help the next generation of agripreneurs grow.</h2>
+              <p className="eyebrow !text-sun">Call for the panel</p>
+              <h2 className="mt-3 font-display text-display-lg !text-white">Mentor, judge or review: help young agripreneurs grow.</h2>
               <p className="mt-3 max-w-xl text-base text-white/90">If you have experience in agribusiness, finance or enterprise support, we would like to hear from you.</p>
             </div>
             <div className="lg:justify-self-end">
-              <LinkButton href="/mentors" className="!rounded-full !bg-sun !px-7 !py-3 text-sm !text-night hover:!bg-lime">Become a mentor</LinkButton>
+              <LinkButton href="/mentors" className="!rounded-full !bg-sun !px-7 !py-3 text-sm !text-night hover:!bg-lime">Join the panel</LinkButton>
             </div>
           </div>
         </Reveal>

@@ -5,10 +5,15 @@ import { NextResponse } from "next/server";
 import type { Permission, SessionUser } from "@/types/user";
 import { SESSION_COOKIE, verifySessionToken } from "./session";
 import { can, homeFor } from "./permissions";
+import { sessionRevoked } from "./passwords";
+import { refreshSessionUser } from "./users";
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const store = await cookies();
-  return verifySessionToken(store.get(SESSION_COOKIE)?.value);
+  const user = await verifySessionToken(store.get(SESSION_COOKIE)?.value);
+  if (!user) return null;
+  if (await sessionRevoked(user.email, user.iat)) return null;   // password was reset (or account deactivated) after this login
+  return refreshSessionUser(user);                                // deactivated accounts lose access; role changes apply at once
 }
 
 /** For server components/pages: redirects to login or to the user's own home when not permitted. */

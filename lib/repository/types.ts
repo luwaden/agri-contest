@@ -1,6 +1,16 @@
 import type { Application, ApplicationStatus } from "@/types/application";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
+import type { StaffAccount } from "@/types/staff";
 
+export interface StoreDiagnosis {
+  ok: boolean; kind: string;
+  tabs: Record<string, "ok" | "missing" | "error">;
+  headerOk: boolean | null;
+  headerProblems?: string[];
+  /** Every checked tab: null = header row correct, otherwise a plain-English problem. */
+  headerIssues?: Record<string, string | null>;
+  code?: string;       // non-sensitive classification of the first failure
+}
 export interface AuditEvent {
   at: string; applicationId: string; actor: string; action: string; detail: string;
 }
@@ -29,5 +39,12 @@ export interface ApplicationRepository {
   getMentorById(id: string): Promise<MentorApplication | null>;
   updateMentorStatus(id: string, status: MentorStatus, actor: string): Promise<MentorApplication | null>;
   getEvents(limit?: number): Promise<AuditEvent[]>;
+  // Staff sign-in accounts kept in the store ("Admin Users" tab). Env accounts are handled in lib/auth/users.ts.
+  getStaff(): Promise<StaffAccount[]>;
+  /** Throws DUPLICATE_EMAIL if the email already exists. */
+  createStaff(a: StaffAccount): Promise<void>;
+  updateStaff(email: string, patch: Partial<Pick<StaffAccount, "name" | "role" | "active" | "note" | "passwordHash">>): Promise<StaffAccount | null>;
+  /** Cheap, read-only check used by /api/health?check=store. Never returns secrets. */
+  diagnose(): Promise<StoreDiagnosis>;
   logEvent(event: AuditEvent): Promise<void>;
 }

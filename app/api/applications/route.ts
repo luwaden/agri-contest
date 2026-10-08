@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
-    const rl = rateLimit(`submit:${clientIp(req)}`, 8, 10 * 60_000);
+    const rl = await rateLimit(`submit:${clientIp(req)}`, 8, 10 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfter);
     const body = (await readJson(req, 100_000)) as { values?: Record<string, unknown>; draftToken?: string; companyWebsite?: string } | null;
     if (!body || typeof body !== "object" || !body.values) return badRequest("We could not read your application. Please try again.");

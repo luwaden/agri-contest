@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   if ("error" in auth) return auth.error;
   if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
   try {
-    const rl = rateLimit(`ai:${auth.user.email}:${clientIp(req)}`, 20, 10 * 60_000);
+    const rl = await rateLimit(`ai:${auth.user.email}:${clientIp(req)}`, 20, 10 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfter);
     const body = (await readJson(req, 4_000)) as { question?: string; filters?: Record<string, string> } | null;
     if (!body?.question || typeof body.question !== "string") return badRequest("Please type a question.");

@@ -4,8 +4,9 @@ import path from "node:path";
 import type { Application, ApplicationStatus } from "@/types/application";
 import type { ApplicationRepository, AuditEvent, DraftRecord } from "./types";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
+import type { StaffAccount } from "@/types/staff";
 
-interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[] }
+interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[] }
 const FILE = path.join(process.cwd(), ".data", "dev-store.json");
 
 let queue: Promise<unknown> = Promise.resolve();
@@ -61,6 +62,18 @@ export class LocalRepository implements ApplicationRepository {
     await save(s); return m;
   });
   getEvents = (limit = 200) => serial(async () => (await load()).events.slice(-limit).reverse());
+  getStaff = () => serial(async () => ((await load()).staff ?? []).map((a) => ({ ...a, source: "sheet" as const })));
+  createStaff = (a: StaffAccount) => serial(async () => {
+    const s = await load(); s.staff ??= [];
+    if (s.staff.some((x) => x.email.toLowerCase() === a.email.toLowerCase())) throw new Error("DUPLICATE_EMAIL");
+    s.staff.push({ ...a, email: a.email.toLowerCase(), source: "sheet" }); await save(s);
+  });
+  updateStaff = (email: string, patch: Partial<Pick<StaffAccount, "name" | "role" | "active" | "note" | "passwordHash">>) => serial(async () => {
+    const s = await load(); const a = (s.staff ?? []).find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
+    if (!a) return null;
+    Object.assign(a, patch, { updatedAt: new Date().toISOString() }); await save(s); return { ...a, source: "sheet" as const };
+  });
+  diagnose = async () => ({ ok: true, kind: "local", tabs: { Applications: "ok" as const }, headerOk: null });
   countDrafts = () => serial(async () => (await load()).drafts.length);
   logEvent = (e: AuditEvent) => serial(async () => { const s = await load(); s.events.push(e); await save(s); });
 }

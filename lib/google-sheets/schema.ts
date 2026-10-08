@@ -1,5 +1,6 @@
 import type { Application } from "@/types/application";
 import { MENTOR_HEADERS } from "./mentorSchema";
+import { STAFF_HEADERS } from "./staffSchema";
 
 export const SHEETS = {
   applications: "Applications",
@@ -60,7 +61,7 @@ export const HEADERS = {
   [SHEETS.drafts]: ["token_hash", "email", "updated_at", "stage", "payload_json"],
   [SHEETS.events]: ["at", "application_id", "actor", "action", "detail"],
   [SHEETS.mentors]: MENTOR_HEADERS,
-  [SHEETS.adminUsers]: ["user_id", "name", "email", "role", "active", "note"],
+  [SHEETS.adminUsers]: STAFF_HEADERS,
   [SHEETS.judges]: ["judge_id", "name", "email", "active", "conflict_declared", "assigned_application_ids"],
   [SHEETS.configuration]: ["key", "value", "updated_at", "updated_by"],
 } as const;
@@ -114,3 +115,24 @@ export const colLetter = (i: number) => {
   let s = ""; for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s; return s;
 };
 export const columnLetterFor = (header: string) => colLetter(APPLICATION_COLUMNS.findIndex((x) => x.header === header));
+
+export type HeaderState = { kind: "ok" } | { kind: "empty" } | { kind: "append"; missing: string[] } | { kind: "conflict"; diffs: string[] };
+
+/** Compares row 1 of a tab with what the app expects. New columns are only ever appended, never inserted. */
+export function compareHeaders(want: readonly string[], got: readonly string[]): HeaderState {
+  const trimmed = [...got]; while (trimmed.length && (trimmed[trimmed.length - 1] ?? "").trim() === "") trimmed.pop();
+  if (trimmed.length === 0) return { kind: "empty" };
+  const diffs: string[] = [];
+  trimmed.forEach((h, i) => { if (i >= want.length) diffs.push(`column ${i + 1} "${h}" is not used by the app`); else if (h.trim() !== want[i]) diffs.push(`column ${i + 1} is "${h}" but should be "${want[i]}"`); });
+  if (diffs.length) return { kind: "conflict", diffs };
+  if (trimmed.length < want.length) return { kind: "append", missing: want.slice(trimmed.length) };
+  return { kind: "ok" };
+}
+
+export function describeHeaderProblem(want: readonly string[], got: readonly string[]): string | null {
+  const s = compareHeaders(want, got);
+  if (s.kind === "ok") return null;
+  if (s.kind === "empty") return "Row 1 has no column titles. Run npm run setup:sheets.";
+  if (s.kind === "append") return `Missing ${s.missing.length} new column title(s) at the end: ${s.missing.join(", ")}. Run npm run setup:sheets.`;
+  return `Row 1 differs from the app: ${s.diffs.slice(0, 3).join("; ")}${s.diffs.length > 3 ? "; …" : ""}. Do not reorder columns; ask for help before changing this tab.`;
+}

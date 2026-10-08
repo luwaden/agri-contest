@@ -124,7 +124,9 @@ var TABS = {
     "motivation",
     "documents_json",
     "consent",
-    "source"
+    "source",
+    "roles",
+    "coi_declared"
   ],
   "Admin Users": [
     "user_id",
@@ -132,7 +134,9 @@ var TABS = {
     "email",
     "role",
     "active",
-    "note"
+    "note",
+    "password_hash",
+    "updated_at"
   ],
   "Judges": [
     "judge_id",

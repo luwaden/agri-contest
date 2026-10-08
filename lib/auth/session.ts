@@ -20,7 +20,7 @@ export async function verifySessionToken(token?: string): Promise<SessionUser | 
   try {
     const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
     if (!payload.sub || !payload.email || !payload.role) return null;
-    return { id: payload.sub, name: String(payload.name), email: String(payload.email), role: payload.role as SessionUser["role"] };
+    return { id: payload.sub, name: String(payload.name), email: String(payload.email), role: payload.role as SessionUser["role"], iat: payload.iat };
   } catch { return null; }
 }
 

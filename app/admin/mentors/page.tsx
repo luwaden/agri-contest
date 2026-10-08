@@ -6,5 +6,5 @@ export const metadata: Metadata = { title: "Mentor applications", robots: { inde
 export const dynamic = "force-dynamic";
 export default async function MentorsAdmin() {
   await requirePagePermission("mentors:review");
-  return (<PortalShell><div className="space-y-5"><div><h1 className="font-display text-3xl text-primary">Mentor applications</h1><p className="text-sm text-ink-soft">Stored separately from applicant records.</p></div><MentorTable /></div></PortalShell>);
+  return (<PortalShell><div className="space-y-5"><div><h1 className="font-display text-3xl text-primary">Panel applications</h1><p className="text-sm text-ink-soft">Mentors, judges and reviewers. Stored separately from applicant records.</p></div><MentorTable /></div></PortalShell>);
 }

@@ -19,4 +19,8 @@ export interface MentorApplication {
   documents: Array<{ kind: string; url: string }>;
   consent: boolean;
   source: string;
+  /** Which roles the person offered: MENTOR, JUDGE, REVIEWER. Older records without it are treated as MENTOR. */
+  roles?: string[];
+  /** Judges and reviewers confirm they will declare conflicts of interest. */
+  coiDeclared?: boolean;
 }

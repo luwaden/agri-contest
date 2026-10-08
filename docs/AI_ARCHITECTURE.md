@@ -31,3 +31,18 @@ ADMIN UI (/admin/ai → /api/admin/ai, permission "ai:query", ADMIN only)
 
 ## Adding a question type
 Add a function to `analyticsService.ts`, include its (aggregate) result in `buildAIContext`, and extend `tests/platform.test.ts` so a test proves no personal data is included.
+
+
+## The assistant (the "Ask" button)
+**Default: signed-in staff only.** Visitors do not see the button and the API refuses them (401). To open it to the public later set `NEXT_PUBLIC_ASSISTANT_PUBLIC=true` and redeploy. A floating **Ask** button appears on every page for staff. What it can answer depends on who is signed in (decided by the server):
+
+| Who | Can ask about | Gets applicant data? |
+|---|---|---|
+| Visitor / applicant / mentor applicant | Eligibility, dates, how to apply, uploads, prizes, privacy, contacts. Typing an application reference returns **only** "received on <date>" | **Never** |
+| Judge, Reviewer | The above + the scoring rubric, bands, conflict of interest, tie-breaks, how their portal works | **Never** (asking for applicant figures is politely refused) |
+| Coordinator, Administrator | The above + how to use the dashboard, export, filters, roles, health check, **and applicant statistics** (aggregate counts only, same as the admin AI panel) | Aggregates only; no names, contacts or ids |
+
+- **Works without any AI key** ("quick answers" mode matches the question to the knowledge base). Add `AI_PROVIDER` + key + model and the same knowledge is used to give natural, multi-turn answers.
+- The knowledge base is `config/knowledge.ts`: one place, edited like text. It states only what the site, the concept note or the framework already say.
+- Public answers are cached in Redis for an hour; visitors are limited to 15 questions per 10 minutes, staff 40.
+- Reference lookups are limited to 8 per 10 minutes per visitor so references cannot be guessed.

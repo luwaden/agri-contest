@@ -5,11 +5,11 @@ import { Wordmark } from "@/components/brand/Wordmark";
 
 const FULL_COLS: Array<[string, Array<[string, string]>]> = [
   ["Programme", [["Overview", "/#programme"], ["Benefits", "/#benefits"], ["Value chains", "/#value-chains"], ["How it works", "/#how-it-works"]]],
-  ["Get involved", [["Apply", "/apply"], ["Call for mentors", "/mentors"], ["FAQ", "/#faq"]]],
+  ["Get involved", [["Apply", "/apply"], ["Mentors, judges & reviewers", "/mentors"], ["FAQ", "/#faq"]]],
   ["About", [["Privacy notice", "/privacy"], ["Terms", "/terms"], ["Staff sign in", "/admin/login"]]],
 ];
 const SHORT_COLS: Array<[string, Array<[string, string]>]> = [
-  ["Get involved", [["Apply", "/apply"], ["Call for mentors", "/mentors"]]],
+  ["Get involved", [["Apply", "/apply"], ["Mentors, judges & reviewers", "/mentors"]]],
   ["About", [["Privacy notice", "/privacy"], ["Terms", "/terms"], ["Staff sign in", "/admin/login"]]],
 ];
 

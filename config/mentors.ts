@@ -1,49 +1,57 @@
-/** Content and option lists for the Call for Mentors page. Only facts from the concept note are stated as fact. */
-export const MENTOR_AREAS = [
-  { value: "FINANCE", label: "Access to finance and investor readiness" },
-  { value: "BUSINESS_PLAN", label: "Business planning and strategy" },
-  { value: "FIN_MGMT", label: "Financial management and record keeping" },
-  { value: "MARKETING", label: "Marketing, sales and branding" },
-  { value: "MARKET_ACCESS", label: "Market access and off-take" },
-  { value: "OPERATIONS", label: "Operations and supply chain" },
-  { value: "PRODUCTION", label: "Crop production and agronomy" },
-  { value: "TECHNOLOGY", label: "Technology and innovation" },
-  { value: "LEGAL", label: "Legal, compliance and formalisation" },
-  { value: "LEADERSHIP", label: "Leadership and team building" },
+/**
+ * Content and options for the "Mentors, Judges & Reviewers" call. Facts come from the Contest Design Framework
+ * and the concept note. Where a fact is still contested (panel size, reviewer pool size, time commitment) the page
+ * says so plainly instead of stating a number.
+ */
+export const PANEL_ROLES = [
+  { value: "MENTOR", label: "Mentor", hint: "Guide a winning venture for six months" },
+  { value: "JUDGE", label: "Judge", hint: "Score entries and join the finale panel" },
+  { value: "REVIEWER", label: "Reviewer", hint: "Score entries in the screening rounds" },
 ] as const;
 
-export const MENTOR_AVAILABILITY = [
-  { value: "LT_2", label: "Less than 2 hours a month" },
+/** Areas of expertise. Mirrors the spread the framework asks the panel to cover. */
+export const PANEL_EXPERTISE = [
+  { value: "AGRIBUSINESS", label: "Agribusiness and value chains" },
+  { value: "AGRI_FINANCE", label: "Agricultural finance and investment" },
+  { value: "TECHNOLOGY", label: "Technology and digital farming" },
+  { value: "MARKET_SYSTEMS", label: "Market systems and supply chains" },
+  { value: "YOUTH_ENTERPRISE", label: "Youth enterprise and business development" },
+  { value: "CLIMATE", label: "Climate-smart agriculture" },
+  { value: "PROCESSING", label: "Agro-processing and value addition" },
+  { value: "INCLUSION", label: "Gender inclusion and social impact" },
+] as const;
+
+export const PANEL_AVAILABILITY = [
+  { value: "LT_2", label: "Under 2 hours a month" },
   { value: "2_5", label: "2 to 5 hours a month" },
   { value: "5_10", label: "5 to 10 hours a month" },
   { value: "GT_10", label: "More than 10 hours a month" },
   { value: "DISCUSS", label: "To be discussed" },
 ] as const;
 
+/** Kept for older records and tools that still import the previous names. */
+export const MENTOR_AREAS = [...PANEL_EXPERTISE, { value: "FINANCE", label: "Access to finance and investor readiness" }, { value: "BUSINESS_PLAN", label: "Business planning and strategy" }, { value: "FIN_MGMT", label: "Financial management" }, { value: "MARKETING", label: "Marketing, sales and branding" }, { value: "MARKET_ACCESS", label: "Market access" }, { value: "OPERATIONS", label: "Operations and supply chain" }, { value: "PRODUCTION", label: "Crop production" }, { value: "LEGAL", label: "Legal and compliance" }, { value: "LEADERSHIP", label: "Leadership" }] as const;
+export const MENTOR_AVAILABILITY = PANEL_AVAILABILITY;
+
 export const MENTOR_STATUSES = [
   { value: "NEW", label: "New" }, { value: "UNDER_REVIEW", label: "Under review" },
   { value: "ACCEPTED", label: "Accepted" }, { value: "DECLINED", label: "Declined" },
 ] as const;
 
-export const MENTOR_PAGE = {
-  why: "Winning ideas need more than capital. The programme gives its ten winners structured mentorship, business development support and investor matchmaking, and every shortlisted venture benefits from experienced eyes on its plan.",
-  who: [
-    "Professionals with experience in agribusiness, finance, enterprise support, technology or related fields",
-    "Business owners and founders who have built or scaled a venture",
-    "Experts in business development services, investor relations or market access",
+export const PANEL_PAGE = {
+  intro: "The contest only works if experienced people give their time. We are building a panel of mentors, judges and reviewers from across agribusiness, finance, technology and enterprise support. Tell us how you would like to help.",
+  roles: [
+    { role: "Mentor", tone: "green", what: "Guides a winning venture through the six months after the contest: advice, introductions and honest feedback.", when: "After the finale" },
+    { role: "Judge", tone: "blue", what: "Scores entries against the published rubric and listens to the finalists' live pitches. Judges are independent experts. Programme staff do not score.", when: "Later rounds and the finale" },
+    { role: "Reviewer", tone: "yellow", what: "Scores entries against the same rubric in the screening rounds, helping the strongest ideas reach the next stage.", when: "Screening rounds" },
   ],
-  expectations: [
-    "Share practical advice and honest feedback",
-    "Help young entrepreneurs sharpen their business plans and pitches",
-    "Open doors to your networks where appropriate",
-    "Treat what founders share with you as confidential",
+  rules: [
+    "Judges and reviewers declare any personal, commercial, advisory or investment relationship with an applicant, and never score that entry.",
+    "Everyone scores against the same published rubric, and every score and comment is recorded for audit.",
+    "What founders share with you is confidential.",
   ],
-  // Deliberately generic: the programme team has not published a fixed mentor time commitment.
-  commitment: "Time commitment is agreed with each mentor. Tell us how much time you could offer in the form and the programme team will match it to what is needed.",
-  process: [
-    ["Apply", "Complete the short form below."],
-    ["Review", "The programme team reviews every mentor application."],
-    ["Match", "Accepted mentors are matched with ventures that fit their expertise."],
-    ["Mentor", "You and your mentee agree how and when to work together."],
-  ],
+  // The framework gives no fixed hours, and the panel size is still being settled, so none is stated.
+  commitment: "Time depends on the role and is agreed with you. Tell us how many hours a month you could offer.",
+  process: [["Apply", "Answer a few short questions."], ["Review", "The programme team reviews every application."], ["Confirm", "If accepted you are told your role and given a login if you will score."], ["Serve", "You are briefed before you start."]],
 } as const;
+export const MENTOR_PAGE = { why: PANEL_PAGE.intro, who: [], expectations: PANEL_PAGE.rules, commitment: PANEL_PAGE.commitment, process: PANEL_PAGE.process } as const;

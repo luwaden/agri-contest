@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { can, homeFor } from "@/lib/auth/permissions";
+import { can, homeFor, isPanelRole } from "@/lib/auth/permissions";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { isDemoMode } from "@/lib/data";
@@ -10,10 +10,10 @@ import { isDemoMode } from "@/lib/data";
 export async function PortalShell({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/admin/login");
-  if (user.role === "JUDGE") redirect(homeFor("JUDGE"));
+  if (isPanelRole(user.role)) redirect(homeFor(user.role));
   const links: Array<[string, string, boolean]> = [
     ["Dashboard", "/admin", true], ["Applications", "/admin/applications", true],
-    ["Mentors", "/admin/mentors", can(user.role, "mentors:review")], ["AI assistant", "/admin/ai", can(user.role, "ai:query")],
+    ["Panel applications", "/admin/mentors", can(user.role, "mentors:review")], ["AI assistant", "/admin/ai", can(user.role, "ai:query")], ["System check", "/admin/system", can(user.role, "reports:view")], ["Staff", "/admin/staff", can(user.role, "users:manage")],
   ];
   return (
     <div className="min-h-screen bg-paper-warm">

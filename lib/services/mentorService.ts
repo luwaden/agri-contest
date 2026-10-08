@@ -18,10 +18,10 @@ export async function submitMentor(values: Record<string, unknown>): Promise<Ser
   for (let i = 0; i < 5; i++) {
     mentor = {
       mentorId: generateReference(new Date().getFullYear(), MENTOR_PREFIX), status: "NEW", submittedAt: now, updatedAt: now,
-      fullName: d.fullName, email: d.email, phone: d.phone, state: d.state, location: d.location, profession: d.profession, organization: d.organization,
-      industry: d.industry, yearsExperience: Number(d.yearsExperience), mentorshipExperience: d.mentorshipExperience, expertise: d.expertise,
-      availability: d.availability, availabilityNotes: d.availabilityNotes, linkedin: d.linkedin, portfolio: d.portfolio, motivation: d.motivation,
-      documents: d.docCv ? [{ kind: "CV", url: d.docCv }] : [], consent: true, source: "web",
+      fullName: d.fullName, email: d.email, phone: d.phone, state: d.state, location: "", profession: d.profession, organization: "",
+      industry: "", yearsExperience: Number(d.yearsExperience), mentorshipExperience: "", expertise: d.expertise,
+      availability: d.availability, availabilityNotes: "", linkedin: d.linkedin, portfolio: "", motivation: d.motivation,
+      documents: [], consent: true, source: "web", roles: d.roles, coiDeclared: d.coi === true,
     };
     try { await repo.createMentor(mentor); break; } catch (e) { if ((e as Error).message !== "DUPLICATE_ID" || i === 4) throw e; }
   }

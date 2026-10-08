@@ -9,12 +9,14 @@ export async function POST(req: NextRequest) {
     if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
     const body = (await readJson(req, 2_000)) as { email?: string; password?: string } | null;
     if (!body?.email || !body?.password) return badRequest("Please enter your email and password.");
-    const rl = rateLimit(`login:${clientIp(req)}:${body.email.toLowerCase()}`, 5, 15 * 60_000);
+    const rl = await rateLimit(`login:${clientIp(req)}:${body.email.toLowerCase()}`, 5, 15 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfter);
     const user = await authenticate(body.email, body.password);
     if (!user) return NextResponse.json({ message: "That email and password do not match. Please try again." }, { status: 401 });
     const res = NextResponse.json({ redirect: homeFor(user.role), name: user.name });
     res.cookies.set(SESSION_COOKIE, await createSessionToken(user), sessionCookieOptions);
+    // Readable hint so the page knows to show staff-only tools. Not trusted: every API re-checks the real session.
+    res.cookies.set("agri_staff", "1", { ...sessionCookieOptions, httpOnly: false });
     return res;
   } catch (e) { return serverError(e); }
 }

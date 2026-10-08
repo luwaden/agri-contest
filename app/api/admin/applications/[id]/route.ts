@@ -5,6 +5,7 @@ import { ACTIVE_STATUS_TRANSITIONS } from "@/config/programme";
 import { badRequest, readJson, sameOrigin, serverError } from "@/lib/http";
 import { REFERENCE_PATTERN } from "@/lib/reference";
 import { isDemoMode } from "@/lib/data";
+import { invalidateAdminCache } from "@/lib/services/analyticsService";
 import type { ApplicationStatus } from "@/types/application";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -18,6 +19,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const body = (await readJson(req, 1_000)) as { status?: string } | null;
     if (!body?.status || !ACTIVE_STATUS_TRANSITIONS.includes(body.status)) return badRequest("Please choose a valid status.");
     const updated = await getRepository().updateStatus(id, body.status as ApplicationStatus, auth.user.email);
+    invalidateAdminCache();
     if (!updated) return NextResponse.json({ message: "We could not find that application." }, { status: 404 });
     return NextResponse.json({ status: updated.submissionStatus });
   } catch (e) { return serverError(e); }

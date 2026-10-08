@@ -3,5 +3,6 @@ import { SESSION_COOKIE } from "@/lib/auth/session";
 export async function POST() {
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
+  res.cookies.set("agri_staff", "", { path: "/", maxAge: 0 });
   return res;
 }

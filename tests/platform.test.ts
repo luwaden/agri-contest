@@ -35,11 +35,22 @@ test("analytics + filters by zone, and focal states stay segmentable", () => {
 });
 
 // ───────── mentors ─────────
-const mentor = { fullName: "Dr Ada Obi", email: "Ada@Example.com", phone: "+2348031234567", state: "Lagos", location: "Ikeja", profession: "Agri-finance specialist", organization: "AgriBank", industry: "Banking", yearsExperience: "12", mentorshipExperience: "Mentored 6 founders.", expertise: ["FINANCE"], availability: "2_5", availabilityNotes: "", linkedin: "", portfolio: "", motivation: "I want to help young founders become investable.", docCv: "", consent: true };
-test("mentor form: valid input passes and is normalised", () => { const r = validateMentor(mentor); assert.equal(r.ok, true); if (r.ok) assert.equal(r.data.email, "ada@example.com"); });
-test("mentor form: friendly errors", () => {
-  const r = validateMentor({ ...mentor, fullName: "", expertise: [], consent: false, linkedin: "javascript:alert(1)" });
-  assert.equal(r.ok, false); if (!r.ok) { assert.equal(r.errors.fullName, "Please enter your full name."); assert.match(r.errors.expertise, /at least one area/); assert.ok(r.errors.consent); assert.ok(r.errors.linkedin); }
+const mentor = { fullName: "Dr Ada Obi", email: "Ada@Example.com", phone: "+2348031234567", state: "Lagos", profession: "Agri-finance manager, AgriBank", yearsExperience: "12", roles: ["MENTOR"], expertise: ["AGRI_FINANCE"], availability: "2_5", motivation: "", linkedin: "", consent: true };
+test("panel form: valid input passes and is normalised", () => { const r = validateMentor(mentor); assert.equal(r.ok, true); if (r.ok) assert.equal(r.data.email, "ada@example.com"); });
+test("panel form: friendly errors", () => {
+  const r = validateMentor({ ...mentor, fullName: "", expertise: [], roles: [], consent: false, linkedin: "javascript:alert(1)" });
+  assert.equal(r.ok, false); if (!r.ok) { assert.equal(r.errors.fullName, "Please enter your full name."); assert.match(r.errors.expertise, /at least one area/); assert.match(r.errors.roles, /at least one role/); assert.ok(r.errors.consent); assert.ok(r.errors.linkedin); }
+});
+test("panel form: judges and reviewers must accept the conflict-of-interest declaration; mentors need not", () => {
+  assert.equal(validateMentor({ ...mentor, roles: ["JUDGE"] }).ok, false);
+  assert.equal(validateMentor({ ...mentor, roles: ["REVIEWER", "MENTOR"], coi: false }).ok, false);
+  assert.equal(validateMentor({ ...mentor, roles: ["JUDGE"], coi: true }).ok, true);
+  assert.equal(validateMentor({ ...mentor, roles: ["MENTOR"] }).ok, true);
+});
+test("panel form asks only 8 required questions (plus consent), as promised on the page", () => {
+  const required = ["fullName", "email", "phone", "state", "profession", "yearsExperience", "roles", "expertise", "availability"];
+  for (const k of required) assert.equal(validateMentor({ ...mentor, [k]: k === "roles" || k === "expertise" ? [] : "" }).ok, false, k);
+  assert.equal(validateMentor({ ...mentor, motivation: undefined, linkedin: undefined }).ok, true);
 });
 
 // ───────── uploads / cloudinary ─────────
@@ -142,3 +153,100 @@ test("broken Google keys give a plain-English reason", () => {
   const damaged = KEY.replace(/\n/g, "\\n").replace("MII", "MIX");
   assert.ok(explainKeyProblem(damaged) !== null);
 });
+
+
+// ───────── roles & permissions ─────────
+import { can, homeFor, isPanelRole, ROLE_PERMISSIONS } from "../lib/auth/permissions";
+test("roles: judges and reviewers see only assigned applications, never lists, analytics or exports", () => {
+  for (const r of ["JUDGE", "REVIEWER"] as const) {
+    assert.ok(can(r, "applications:view-assigned") && can(r, "scores:submit")); assert.ok(isPanelRole(r));
+    for (const p of ["applications:view", "analytics:view", "export:data", "mentors:review", "ai:query", "applications:status"] as const) assert.equal(can(r, p), false, `${r} must not have ${p}`);
+  }
+  assert.ok(can("ADMIN", "ai:query") && can("COORDINATOR", "ai:query") && can("COORDINATOR", "export:data"));
+  assert.equal(can("COORDINATOR", "config:manage"), false);
+  assert.deepEqual([homeFor("ADMIN"), homeFor("COORDINATOR"), homeFor("JUDGE"), homeFor("REVIEWER")], ["/admin", "/admin", "/judge", "/review"]);
+  assert.equal(Object.keys(ROLE_PERMISSIONS).length, 4);
+});
+
+// ───────── scoring (Contest Design Framework section 6, 7.1) ─────────
+import { bandFor, compareRanked, weightedTotal } from "../lib/scoring";
+import { DEFAULT_CRITERIA } from "../config/scoring";
+test("rubric weights are the framework's 30/25/25/10/10 and total 100", () => {
+  assert.deepEqual(DEFAULT_CRITERIA.map((c) => [c.id, c.weight]), [["originality", 30], ["feasibility", 25], ["scalability", 25], ["impact", 10], ["market", 10]]);
+  assert.equal(DEFAULT_CRITERIA.reduce((n, c) => n + c.weight, 0), 100);
+});
+test("weighted total is out of 100 and never counts a missing score as zero", () => {
+  assert.equal(weightedTotal({ originality: 10, feasibility: 10, scalability: 10, impact: 10, market: 10 }), 100);
+  assert.equal(weightedTotal({ originality: 5, feasibility: 5, scalability: 5, impact: 5, market: 5 }), 50);
+  assert.equal(weightedTotal({ originality: 8, feasibility: 6, scalability: 7, impact: 9, market: 4 }), 24 + 15 + 17.5 + 9 + 4);
+  assert.equal(weightedTotal({ originality: 8, feasibility: 6, scalability: 7, impact: 9 }), null);   // market missing
+  assert.equal(weightedTotal({ originality: 11, feasibility: 6, scalability: 7, impact: 9, market: 4 }), null); // out of range
+  assert.equal(bandFor(9), "Exceptional"); assert.equal(bandFor(7), "Strong"); assert.equal(bandFor(2), "Insufficient");
+});
+test("ties are broken by originality, then scalability, then feasibility", () => {
+  const a = { id: "a", total: 70, raw: { originality: 8, scalability: 6, feasibility: 6 } }, b = { id: "b", total: 70, raw: { originality: 7, scalability: 9, feasibility: 9 } };
+  assert.ok(compareRanked(a, b) < 0);
+  const c = { id: "c", total: 70, raw: { originality: 8, scalability: 7, feasibility: 1 } }; assert.ok(compareRanked(c, a) < 0);
+  const d = { id: "d", total: 70, raw: { originality: 8, scalability: 6, feasibility: 7 } }; assert.ok(compareRanked(d, a) < 0);
+  assert.equal(compareRanked(a, { ...a, id: "z" }), 0);
+});
+
+// ───────── Redis / KV layer (in-memory path) ─────────
+import { kv } from "../lib/kv";
+import { classifyError } from "../lib/http";
+test("kv: counters expire, set-if-absent is atomic, sets dedupe", async () => {
+  assert.equal(await kv.incr("t:c", 60), 1); assert.equal(await kv.incr("t:c", 60), 2); assert.ok((await kv.ttl("t:c")) > 0);
+  assert.equal(await kv.set("t:nx", "a", { nx: true }), true); assert.equal(await kv.set("t:nx", "b", { nx: true }), false); assert.equal(await kv.get("t:nx"), "a");
+  assert.equal(await kv.sadd("t:s", "x"), true); assert.equal(await kv.sadd("t:s", "x"), false); await kv.srem("t:s", "x"); assert.equal(await kv.sadd("t:s", "x"), true);
+});
+test("errors are classified into safe codes", () => {
+  assert.equal(classifyError(new Error("DATA_BACKEND=local is not allowed in production.")), "STORE_NOT_CONFIGURED");
+  assert.equal(classifyError(new Error("Google Sheets key problem: cut off")), "GOOGLE_KEY");
+  assert.equal(classifyError({ message: "x", response: { status: 403, data: { error: { message: "The caller does not have permission" } } } }), "SHEET_NOT_SHARED");
+  assert.equal(classifyError({ message: "Unable to parse range: Drafts!A1" }), "SHEET_TAB_MISSING");
+  assert.equal(classifyError({ message: "x", response: { status: 429 } }), "SHEET_QUOTA");
+  assert.equal(classifyError(new Error("fetch failed")), "NETWORK"); assert.equal(classifyError(new Error("weird")), "UNKNOWN");
+});
+
+// ───────── assistant knowledge ─────────
+import { basicAnswer, rank } from "../lib/assistant/retrieve";
+import { KNOWLEDGE } from "../config/knowledge";
+test("assistant: visitors get programme answers and never staff-only entries", () => {
+  assert.match(basicAnswer("Who can apply?")!.answer, /aged 18 to 35/);
+  assert.match(basicAnswer("when is the deadline")!.answer, /Applications/);
+  assert.equal(rank("what is the scoring rubric").some((r) => r.entry.audience !== "public"), false);
+  assert.equal(rank("how do i export a csv of applications").some((r) => r.entry.audience === "admin"), false);
+});
+test("assistant: judges see the rubric but not admin tools; admins see everything", () => {
+  assert.match(basicAnswer("what is the scoring rubric", "JUDGE")!.answer, /Originality 30%/);
+  assert.equal(rank("how do i export csv", "REVIEWER").some((r) => r.entry.audience === "admin"), false);
+  assert.ok(rank("how do i export csv", "ADMIN").some((r) => r.entry.id === "export"));
+  assert.equal(basicAnswer("zzzz qqqq"), null);
+});
+test("assistant knowledge never states a quota, focal state or invented amount", () => {
+  const all = KNOWLEDGE.map((k) => `${k.q} ${k.a()}`).join(" ");
+  assert.ok(!/\b(60|40)\s?%/.test(all) && !/focal/i.test(all) && !/₦\s?\d/.test(all));
+});
+
+
+// ───────── password reset (logic runs on the in-memory KV in tests) ─────────
+import { consumeResetToken, createResetToken, passwordProblem, sessionRevoked } from "../lib/auth/passwords";
+test("password rules", () => {
+  assert.ok(passwordProblem("short")); assert.ok(passwordProblem("aaaaaaaaaaaa")); assert.ok(passwordProblem("password123"));
+  assert.ok(passwordProblem("ada.obi-2026-x", "ada.obi@example.org")); assert.equal(passwordProblem("green maize fields at dawn"), null);
+});
+test("reset link: works once, sets a new password, rejects reuse and bad tokens", async () => {
+  const { token, expiresAt } = await createResetToken("Reviewer@Example.org");
+  assert.ok(token.length >= 40 && Date.parse(expiresAt) > Date.now());
+  assert.equal((await consumeResetToken(token, "short")).ok, false);                       // weak password: link stays valid
+  const r = await consumeResetToken(token, "green maize fields at dawn"); assert.equal(r.ok, true); if (r.ok) assert.equal(r.email, "reviewer@example.org");
+  const again = await consumeResetToken(token, "another long password 2"); assert.equal(again.ok, false);   // single use
+  assert.equal((await consumeResetToken("x".repeat(43), "another long password 2")).ok, false);
+});
+test("sessions issued before a reset are treated as revoked (only when Redis is on)", async () => {
+  assert.equal(await sessionRevoked("reviewer@example.org", Math.floor(Date.now() / 1000) - 3600), false); // Redis off in tests → never revoked
+});
+
+// ───────── system check: form-to-sheet round trip ─────────
+import { mappingRoundTrip } from "../lib/selftest/mapping";
+test("system check: a full application converts to a sheet row and back", () => { const m = mappingRoundTrip(); assert.equal(m.ok, true, m.detail); assert.match(m.detail, /74 cells/); });

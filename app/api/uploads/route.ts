@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
-    const rl = rateLimit(`upload:${clientIp(req)}`, 25, 10 * 60_000);
+    const rl = await rateLimit(`upload:${clientIp(req)}`, 25, 10 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfter);
     const declared = Number(req.headers.get("content-length") || 0);
     if (declared > MAX_BYTES() + 64 * 1024) return NextResponse.json({ message: "That file is too large." }, { status: 413 });

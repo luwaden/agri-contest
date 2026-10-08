@@ -52,6 +52,10 @@ See `docs/BRAND_NOTES.md`. Logos and colours: `config/brand.ts`. Fonts: `public/
 |---|---|
 | `docs/GO_LIVE_GOOGLE_SHEETS.md` | **Start here to go live**: Apps Script (fastest) or service account |
 | `apps-script/Code.gs` | The script that goes inside the Google Sheet (regenerate with `npm run build:appsscript`) |
+| `docs/FIX_500_ON_VERCEL.md` | What to do when the live form shows 500, step by step |
+| `docs/ACCESS_AND_LOGIN.md` | Who can log in, what each role can do, adding staff, forgot-password (plain English) |
+| `docs/UPSTASH.md` | Why Redis, how to switch it on |
+| `docs/DESIGN_ALIGNMENT.md` | The Contest Design Framework compared with the app, and decisions needed |
 | `docs/GOOGLE_SHEETS_SETUP.md` | Create the sheet and credentials; `npm run setup:sheets` (also creates the **Mentors** tab) |
 | `docs/GOOGLE_SCRIPT.md` | Optional Apps Script mirror |
 | `docs/CLOUDINARY.md` | Folder structure, private files, validation |

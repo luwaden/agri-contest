@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
 export function LoginForm() {
@@ -22,6 +23,7 @@ export function LoginForm() {
       <div className="space-y-1.5"><label htmlFor="email" className="block text-[15px] font-medium">Email</label><input id="email" name="email" type="email" autoComplete="username" required className="input-base" /></div>
       <div className="space-y-1.5"><label htmlFor="password" className="block text-[15px] font-medium">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required className="input-base" /></div>
       <Button type="submit" disabled={busy} className="w-full">{busy ? "Signing in…" : "Sign in"}</Button>
+      <p className="text-center text-sm"><Link href="/admin/forgot" className="font-semibold text-azure underline">Forgot your password?</Link></p>
     </form>
   );
 }

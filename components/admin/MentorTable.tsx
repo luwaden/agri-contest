@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
-import { MENTOR_AREAS, MENTOR_STATUSES } from "@/config/mentors";
+import { MENTOR_AREAS, MENTOR_STATUSES, PANEL_ROLES } from "@/config/mentors";
 import { formatDate } from "@/lib/labels";
 
-interface Row { mentorId: string; fullName: string; organization: string; profession: string; state: string; yearsExperience: number; expertise: string[]; availability: string; status: string; submittedAt: string }
+interface Row { mentorId: string; fullName: string; organization: string; profession: string; state: string; yearsExperience: number; expertise: string[]; availability: string; status: string; submittedAt: string; roles?: string[] }
+const roleLabel = (v: string) => PANEL_ROLES.find((r) => r.value === v)?.label ?? v;
 const label = (v: string) => MENTOR_AREAS.find((a) => a.value === v)?.label ?? v;
 
 export function MentorStatusBadge({ status }: { status: string }) {
@@ -35,12 +36,12 @@ export function MentorTable() {
   return (
     <div className="overflow-x-auto rounded-card border border-paper-line bg-white">
       <table className="w-full min-w-[900px] text-sm">
-        <thead className="bg-primary text-left text-xs text-white"><tr>{["Reference", "Name", "Organisation", "Based in", "Years", "Can mentor in", "Status", "Received", "Actions"].map((h) => <th key={h} scope="col" className="whitespace-nowrap px-3 py-3 font-semibold">{h}</th>)}</tr></thead>
+        <thead className="bg-primary text-left text-xs text-white"><tr>{["Reference", "Name", "Applying as", "Role & organisation", "Based in", "Years", "Expertise", "Status", "Received", "Actions"].map((h) => <th key={h} scope="col" className="whitespace-nowrap px-3 py-3 font-semibold">{h}</th>)}</tr></thead>
         <tbody className="divide-y divide-paper-line">
           {rows.map((m) => (
             <tr key={m.mentorId} className="align-top hover:bg-paper-warm/60">
               <td className="whitespace-nowrap px-3 py-3 font-mono text-xs">{m.mentorId}</td><td className="px-3 py-3 font-semibold text-primary">{m.fullName}</td>
-              <td className="px-3 py-3">{m.organization}<span className="block text-xs text-ink-muted">{m.profession}</span></td><td className="px-3 py-3">{m.state}</td><td className="px-3 py-3 tabular-nums">{m.yearsExperience}</td>
+              <td className="px-3 py-3 text-xs font-semibold text-primary">{(m.roles?.length ? m.roles : ["MENTOR"]).map(roleLabel).join(", ")}</td><td className="px-3 py-3">{m.profession}{m.organization ? <span className="block text-xs text-ink-muted">{m.organization}</span> : null}</td><td className="px-3 py-3">{m.state}</td><td className="px-3 py-3 tabular-nums">{m.yearsExperience}</td>
               <td className="max-w-[260px] px-3 py-3 text-xs">{m.expertise.map(label).join(", ")}</td><td className="px-3 py-3"><MentorStatusBadge status={m.status} /></td>
               <td className="whitespace-nowrap px-3 py-3">{formatDate(m.submittedAt)}</td>
               <td className="px-3 py-3"><div className="flex items-start gap-3"><Link href={`/admin/mentors/${m.mentorId}`} className="font-bold text-azure hover:underline">View</Link><MentorStatusSelect id={m.mentorId} status={m.status} /></div></td>
