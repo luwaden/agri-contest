@@ -151,7 +151,7 @@ export function MentorCTA() {
               <p className="mt-3 max-w-xl text-base text-white/90">Mentors, Judges and Reviewers: Help Nigeria’s young Agri-preneurs grow. If you have experience in Agricultural businesses, finance or Entreprrise support and BDSPs...</p>
             </div>
             <div className="lg:justify-self-end">
-              <LinkButton href="/mentors" className="!rounded-full !bg-sun !px-7 !py-3 text-sm !text-night hover:!bg-lime">Join the panel</LinkButton>
+              <LinkButton href="/mentors" className="!rounded-full !bg-sun !px-7 !py-3 text-sm !text-night hover:!bg-lime">Join the experts</LinkButton>
             </div>
           </div>
         </Reveal>

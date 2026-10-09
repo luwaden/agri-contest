@@ -59,7 +59,7 @@ Safety built in: the link **works once** and **expires after 30 minutes**; only 
 | | Judges/Reviewers see **no applications until assignments are built** (next release). That is deliberate: they must never browse the full list |
 
 ## How a person becomes a judge or reviewer
-1. They apply on **/mentors** ("Join the panel") and choose Mentor, Judge and/or Reviewer. Judges and reviewers also tick the conflict-of-interest declaration.
+1. They apply on **/mentors** ("Join the experts") and choose Mentor, Judge and/or Reviewer. Judges and reviewers also tick the conflict-of-interest declaration.
 2. An administrator reviews them at **Admin → Panel applications** and sets the status to Accepted.
 3. The administrator adds them in Admin → Staff and sends the invite link.
 

@@ -7,9 +7,9 @@ import { Wordmark } from "@/components/brand/Wordmark";
 /** Anchor links only make sense on the long-form homepage. Every other page gets the short menu. */
 const FULL_NAV = [
   { href: "/#programme", label: "Programme" }, { href: "/#benefits", label: "Benefits" }, { href: "/#value-chains", label: "Value chains" },
-  { href: "/#how-it-works", label: "How it works" }, { href: "/mentors", label: "Join the panel" }, { href: "/#faq", label: "FAQ" },
+  { href: "/#how-it-works", label: "How it works" }, { href: "/mentors", label: "Join the experts" }, { href: "/#faq", label: "FAQ" },
 ];
-const SHORT_NAV = [{ href: "/mentors", label: "Join the panel" }];
+const SHORT_NAV = [{ href: "/mentors", label: "Join the experts" }];
 
 export function SiteHeader({ cta, canApply, full = true }: { cta: string; canApply: boolean; full?: boolean }) {
   const NAV = full ? FULL_NAV : SHORT_NAV;
