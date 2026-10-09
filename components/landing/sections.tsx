@@ -148,7 +148,7 @@ export function MentorCTA() {
             <div>
               <p className="eyebrow !text-sun">Call for the panel</p>
               <h2 className="mt-3 font-display text-display-lg !text-white">Mentor, judge or review: help young agripreneurs grow.</h2>
-              <p className="mt-3 max-w-xl text-base text-white/90">If you have experience in agribusiness, finance or enterprise support, we would like to hear from you.</p>
+              <p className="mt-3 max-w-xl text-base text-white/90">Mentors, Judges and Reviewers: Help Nigeria’s young Agri-preneurs grow. If you have experience in Agricultural businesses, finance or Entreprrise support and BDSPs...</p>
             </div>
             <div className="lg:justify-self-end">
               <LinkButton href="/mentors" className="!rounded-full !bg-sun !px-7 !py-3 text-sm !text-night hover:!bg-lime">Join the panel</LinkButton>
