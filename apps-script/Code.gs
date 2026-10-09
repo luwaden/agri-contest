@@ -126,7 +126,9 @@ var TABS = {
     "consent",
     "source",
     "roles",
-    "coi_declared"
+    "coi_declared",
+    "first_name",
+    "last_name"
   ],
   "Admin Users": [
     "user_id",

@@ -35,22 +35,39 @@ test("analytics + filters by zone, and focal states stay segmentable", () => {
 });
 
 // ───────── mentors ─────────
-const mentor = { fullName: "Dr Ada Obi", email: "Ada@Example.com", phone: "+2348031234567", state: "Lagos", profession: "Agri-finance manager, AgriBank", yearsExperience: "12", roles: ["MENTOR"], expertise: ["AGRI_FINANCE"], availability: "2_5", motivation: "", linkedin: "", consent: true };
+const mentor = { firstName: "Ada", lastName: "Obi", email: "Ada@Example.com", phone: "+2348031234567", state: "Lagos", profession: "Agri-finance manager, AgriBank", yearsExperience: "12", role: "MENTOR", expertise: ["AGRI_FINANCE"], availability: "2_5", motivation: "", linkedin: "https://www.linkedin.com/in/ada-obi", consent: true };
 test("panel form: valid input passes and is normalised", () => { const r = validateMentor(mentor); assert.equal(r.ok, true); if (r.ok) assert.equal(r.data.email, "ada@example.com"); });
 test("panel form: friendly errors", () => {
-  const r = validateMentor({ ...mentor, fullName: "", expertise: [], roles: [], consent: false, linkedin: "javascript:alert(1)" });
-  assert.equal(r.ok, false); if (!r.ok) { assert.equal(r.errors.fullName, "Please enter your full name."); assert.match(r.errors.expertise, /at least one area/); assert.match(r.errors.roles, /at least one role/); assert.ok(r.errors.consent); assert.ok(r.errors.linkedin); }
+  const r = validateMentor({ ...mentor, firstName: "", lastName: "", expertise: [], role: "", consent: false, linkedin: "javascript:alert(1)" });
+  assert.equal(r.ok, false); if (!r.ok) {
+    assert.equal(r.errors.firstName, "Please enter your first name."); assert.equal(r.errors.lastName, "Please enter your surname.");
+    assert.match(r.errors.expertise, /at least one area/); assert.match(r.errors.role, /what you would like to serve as/); assert.ok(r.errors.consent); assert.match(r.errors.linkedin, /LinkedIn/);
+  }
+});
+test("panel form: first name and surname are separate, letters only, and the full name is built from them", () => {
+  assert.equal(validateMentor({ ...mentor, firstName: "Ada Obi" , lastName: "" }).ok, false);
+  assert.equal(validateMentor({ ...mentor, firstName: "=HYPERLINK(1)" }).ok, false);
+  const r = validateMentor({ ...mentor, firstName: "  Chukwuemeka ", lastName: "Ọkafor-Adé" }); assert.equal(r.ok, true); if (r.ok) assert.deepEqual([r.data.firstName, r.data.lastName], ["Chukwuemeka", "Ọkafor-Adé"]);
+});
+test("panel form: LinkedIn is required and must be a linkedin.com link (https:// added if missing)", () => {
+  for (const bad of ["", undefined, "https://example.com/ada", "https://linkedin.com.evil.io/in/x", "https://www.linkedin.com/", "not a link"]) assert.equal(validateMentor({ ...mentor, linkedin: bad }).ok, false, String(bad));
+  const r = validateMentor({ ...mentor, linkedin: "linkedin.com/in/ada-obi" }); assert.equal(r.ok, true); if (r.ok) assert.equal(r.data.linkedin, "https://linkedin.com/in/ada-obi");
+  const h = validateMentor({ ...mentor, linkedin: "http://ng.linkedin.com/in/ada" }); assert.equal(h.ok, true); if (h.ok) assert.equal(h.data.linkedin, "https://ng.linkedin.com/in/ada");
+});
+test("panel form: exactly ONE role; a list of roles is refused", () => {
+  assert.equal(validateMentor({ ...mentor, role: ["MENTOR", "JUDGE"] }).ok, false);
+  assert.equal(validateMentor({ ...mentor, role: "CHAIR" }).ok, false);
 });
 test("panel form: judges and reviewers must accept the conflict-of-interest declaration; mentors need not", () => {
-  assert.equal(validateMentor({ ...mentor, roles: ["JUDGE"] }).ok, false);
-  assert.equal(validateMentor({ ...mentor, roles: ["REVIEWER", "MENTOR"], coi: false }).ok, false);
-  assert.equal(validateMentor({ ...mentor, roles: ["JUDGE"], coi: true }).ok, true);
-  assert.equal(validateMentor({ ...mentor, roles: ["MENTOR"] }).ok, true);
+  assert.equal(validateMentor({ ...mentor, role: "JUDGE" }).ok, false);
+  assert.equal(validateMentor({ ...mentor, role: "REVIEWER", coi: false }).ok, false);
+  assert.equal(validateMentor({ ...mentor, role: "JUDGE", coi: true }).ok, true);
+  assert.equal(validateMentor({ ...mentor, role: "MENTOR" }).ok, true);
 });
-test("panel form asks only 8 required questions (plus consent), as promised on the page", () => {
-  const required = ["fullName", "email", "phone", "state", "profession", "yearsExperience", "roles", "expertise", "availability"];
-  for (const k of required) assert.equal(validateMentor({ ...mentor, [k]: k === "roles" || k === "expertise" ? [] : "" }).ok, false, k);
-  assert.equal(validateMentor({ ...mentor, motivation: undefined, linkedin: undefined }).ok, true);
+test("panel form: every question is required except 'anything else'", () => {
+  const required = ["firstName", "lastName", "email", "phone", "state", "profession", "yearsExperience", "role", "expertise", "availability", "linkedin"];
+  for (const k of required) assert.equal(validateMentor({ ...mentor, [k]: k === "expertise" ? [] : "" }).ok, false, k);
+  assert.equal(validateMentor({ ...mentor, motivation: undefined }).ok, true);
 });
 
 // ───────── uploads / cloudinary ─────────
@@ -250,3 +267,9 @@ test("sessions issued before a reset are treated as revoked (only when Redis is 
 // ───────── system check: form-to-sheet round trip ─────────
 import { mappingRoundTrip } from "../lib/selftest/mapping";
 test("system check: a full application converts to a sheet row and back", () => { const m = mappingRoundTrip(); assert.equal(m.ok, true, m.detail); assert.match(m.detail, /74 cells/); });
+
+test("panel form: a page opened before the update gets 'please refresh', not errors for fields it does not have", async () => {
+  const { submitMentor } = await import("../lib/services/mentorService");
+  const r = await submitMentor({ fullName: "Ada Obi", roles: ["MENTOR", "JUDGE"], email: "ada@example.org" });
+  assert.equal(r.ok, false); if (!r.ok) { assert.equal(r.status, 409); assert.equal(r.body.code, "FORM_UPDATED"); assert.match(String(r.body.message), /refresh the page/); }
+});

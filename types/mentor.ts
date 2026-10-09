@@ -6,7 +6,11 @@ export interface MentorApplication {
   status: MentorStatus;
   submittedAt: string;
   updatedAt: string;
-  fullName: string; email: string; phone: string;
+  /** "First Last". Kept for older records and every screen that shows a name. */
+  fullName: string;
+  /** Asked separately since October 2026. Older records only have fullName. */
+  firstName?: string; lastName?: string;
+  email: string; phone: string;
   state: string; location: string;
   profession: string; organization: string; industry: string;
   yearsExperience: number;
@@ -19,7 +23,7 @@ export interface MentorApplication {
   documents: Array<{ kind: string; url: string }>;
   consent: boolean;
   source: string;
-  /** Which roles the person offered: MENTOR, JUDGE, REVIEWER. Older records without it are treated as MENTOR. */
+  /** The role the person applied for: MENTOR, JUDGE or REVIEWER. The form now allows ONE; older records may hold several, and records without it are treated as MENTOR. */
   roles?: string[];
   /** Judges and reviewers confirm they will declare conflicts of interest. */
   coiDeclared?: boolean;

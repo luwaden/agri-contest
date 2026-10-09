@@ -9,7 +9,7 @@ import { CopyReference } from "@/components/application/CopyReference";
 
 /** Short application for mentors, judges and reviewers. Same field components as the applicant form. */
 export function MentorApplicationForm() {
-  const [values, setValues] = useState<Record<string, any>>({ expertise: [], roles: [] });
+  const [values, setValues] = useState<Record<string, any>>({ expertise: [] });
   const [errors, setErrors] = useState<MentorErrors>({});
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -52,7 +52,7 @@ export function MentorApplicationForm() {
     );
   }
 
-  const wantsScoring = Array.isArray(values.roles) && (values.roles.includes("JUDGE") || values.roles.includes("REVIEWER"));
+  const wantsScoring = values.role === "JUDGE" || values.role === "REVIEWER";
   return (
     <FormCtx.Provider value={ctx}>
       <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-9" aria-busy={busy}>
@@ -60,20 +60,20 @@ export function MentorApplicationForm() {
         {note && <div role="alert" className="rounded-md border border-danger-line bg-danger-bg px-4 py-3 text-sm font-medium text-danger-fg">{note}</div>}
 
         <FormSection title="How would you like to help?">
-          <CheckboxGroupField name="roles" label="I would like to serve as" required hint="Choose one or more." options={PANEL_ROLES.map((r) => ({ value: r.value, label: `${r.label}: ${r.hint}` }))} />
+          <RadioField name="role" label="I would like to serve as" required hint="Choose one." options={PANEL_ROLES.map((r) => ({ value: r.value, label: r.label, hint: r.hint }))} />
           <CheckboxGroupField name="expertise" label="My areas of expertise" required options={PANEL_EXPERTISE} />
           <RadioField name="availability" label="Time I could offer" required options={PANEL_AVAILABILITY} columns />
         </FormSection>
 
         <FormSection title="About you">
-          <Row><TextField name="fullName" label="Full name" required autoComplete="name" /><TextField name="email" label="Email address" required type="email" inputMode="email" autoComplete="email" /></Row>
-          <Row><TextField name="phone" label="Phone number" required type="tel" inputMode="tel" autoComplete="tel" /><SelectField name="state" label="Where are you based?" required options={[...NIGERIAN_STATES, "Outside Nigeria"]} placeholder="Select" /></Row>
+          <Row><TextField name="firstName" label="First name" required autoComplete="given-name" /><TextField name="lastName" label="Surname" required autoComplete="family-name" /></Row>
+          <Row><TextField name="email" label="Email address" required type="email" inputMode="email" autoComplete="email" /><TextField name="phone" label="Phone number" required type="tel" inputMode="tel" autoComplete="tel" /></Row>
+          <Row><SelectField name="state" label="Where are you based?" required options={[...NIGERIAN_STATES, "Outside Nigeria"]} placeholder="Select" /><TextField name="linkedin" label="LinkedIn profile" required type="url" inputMode="url" autoComplete="url" placeholder="https://www.linkedin.com/in/your-name" /></Row>
           <Row><TextField name="profession" label="Current role and organisation" required placeholder="e.g. Agri-finance manager, AgriBank" /><NumberField name="yearsExperience" label="Years of experience" required /></Row>
         </FormSection>
 
         <FormSection title="Optional">
           <TextAreaField name="motivation" label="Anything else you would like us to know" max={500} rows={3} />
-          <TextField name="linkedin" label="LinkedIn profile" type="url" inputMode="url" placeholder="https://" />
         </FormSection>
 
         <div className="space-y-3">

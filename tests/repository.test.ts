@@ -72,9 +72,9 @@ async function contract(name: string, repo: ApplicationRepository) {
   await repo.deleteDraft("h1"); assert.equal(await repo.getDraft("h1"), null); assert.equal(await repo.countDrafts(), 0, `${name}: draft deleted`);
   await repo.createApplication(mk("AGRA-2026-AAAAA4", { email: "m@example.com" })); assert.equal((await repo.getApplications()).length, 3, `${name}: append after cleared draft row`);
   // mentors
-  const m = { mentorId: "MNTR-2026-AAAAA2", status: "NEW" as const, submittedAt: "2026-10-05T10:00:00Z", updatedAt: "2026-10-05T10:00:00Z", fullName: "Dr Ada Obi", email: "ada@example.com", phone: "+2348031234567", state: "Lagos", location: "Ikeja", profession: "Banker", organization: "AgriBank", industry: "Banking", yearsExperience: 12, mentorshipExperience: "Some", expertise: ["FINANCE", "MARKETING"], availability: "2_5", availabilityNotes: "", linkedin: "", portfolio: "", motivation: "Help founders", documents: [], consent: true, source: "web" };
+  const m = { mentorId: "MNTR-2026-AAAAA2", status: "NEW" as const, submittedAt: "2026-10-05T10:00:00Z", updatedAt: "2026-10-05T10:00:00Z", fullName: "Ada Obi", firstName: "Ada", lastName: "Obi", email: "ada@example.com", phone: "+2348031234567", state: "Lagos", location: "Ikeja", profession: "Banker", organization: "AgriBank", industry: "Banking", yearsExperience: 12, mentorshipExperience: "Some", expertise: ["FINANCE", "MARKETING"], availability: "2_5", availabilityNotes: "", linkedin: "", portfolio: "", motivation: "Help founders", documents: [], consent: true, source: "web" };
   await repo.createMentor(m); await assert.rejects(() => repo.createMentor(m), /DUPLICATE_ID/);
-  const gm = (await repo.getMentorById("MNTR-2026-AAAAA2"))!; assert.deepEqual([gm.fullName, gm.phone, gm.expertise], ["Dr Ada Obi", "+2348031234567", ["FINANCE", "MARKETING"]], `${name}: mentor round trip`);
+  const gm = (await repo.getMentorById("MNTR-2026-AAAAA2"))!; assert.deepEqual([gm.fullName, gm.firstName, gm.lastName, gm.phone, gm.expertise], ["Ada Obi", "Ada", "Obi", "+2348031234567", ["FINANCE", "MARKETING"]], `${name}: mentor round trip`);
   assert.equal((await repo.updateMentorStatus("MNTR-2026-AAAAA2", "ACCEPTED", "tester"))!.status, "ACCEPTED"); assert.equal((await repo.getMentors()).length, 1);
 }
 

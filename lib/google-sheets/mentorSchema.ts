@@ -4,7 +4,7 @@ import type { MentorApplication } from "@/types/mentor";
 export const MENTOR_HEADERS = [
   "mentor_id", "status", "submitted_at", "updated_at", "full_name", "email", "phone", "state", "location", "profession", "organization",
   "industry", "years_experience", "mentorship_experience", "expertise", "availability", "availability_notes", "linkedin", "portfolio",
-  "motivation", "documents_json", "consent", "source", "roles", "coi_declared",
+  "motivation", "documents_json", "consent", "source", "roles", "coi_declared", "first_name", "last_name",
 ] as const;
 
 const guard = (s: string) => (/^[=+\-@]/.test(s) ? `'${s}` : s);
@@ -14,6 +14,7 @@ export const mentorToRow = (m: MentorApplication): string[] => [
   m.mentorId, m.status, m.submittedAt, m.updatedAt, guard(m.fullName), guard(m.email), guard(m.phone), m.state, guard(m.location), guard(m.profession),
   guard(m.organization), guard(m.industry), String(m.yearsExperience), guard(m.mentorshipExperience), guard(m.expertise.join("; ")), m.availability,
   guard(m.availabilityNotes), guard(m.linkedin), guard(m.portfolio), guard(m.motivation), JSON.stringify(m.documents), m.consent ? "TRUE" : "FALSE", m.source, (m.roles ?? ["MENTOR"]).join("; "), m.coiDeclared ? "TRUE" : "FALSE",
+  guard(m.firstName ?? ""), guard(m.lastName ?? ""),
 ];
 
 export function rowToMentor(r: string[]): MentorApplication {
@@ -25,5 +26,6 @@ export function rowToMentor(r: string[]): MentorApplication {
     expertise: r[14] ? unguard(r[14]).split("; ") : [], availability: r[15] ?? "", availabilityNotes: unguard(r[16] ?? ""), linkedin: unguard(r[17] ?? ""),
     portfolio: unguard(r[18] ?? ""), motivation: unguard(r[19] ?? ""), documents, consent: (r[21] ?? "").toUpperCase() === "TRUE", source: r[22] ?? "web",
     roles: r[23] ? r[23].split("; ") : ["MENTOR"], coiDeclared: (r[24] ?? "").toUpperCase() === "TRUE",
+    ...(r[25] || r[26] ? { firstName: unguard(r[25] ?? ""), lastName: unguard(r[26] ?? "") } : {}),
   };
 }
