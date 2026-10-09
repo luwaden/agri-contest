@@ -23,7 +23,7 @@ export function SiteFooter({ full = true }: { full?: boolean }) {
           <Wordmark tone="onDark" size="lg" />
           <p className="mt-5 max-w-sm text-white/85">{PROGRAMME.tagline}</p>
           <p className="mt-4 font-semibold text-lime">{PROGRAMME.hashtag}</p>
-          <p className="mt-6 text-sm text-white/85">Contact: <a className="font-semibold text-white underline underline-offset-2" href={`mailto:${PROGRAMME.contactEmail}`}>{PROGRAMME.contactEmail}</a></p>
+          <p className="mt-6 text-sm text-white/85">Enquiry: <a className="font-semibold text-white underline underline-offset-2" href={`mailto:${PROGRAMME.contactEmail}`}>{PROGRAMME.contactEmail}</a></p>
         </div>
         <nav aria-label="Footer" className={`grid gap-8 ${full ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           {COLS.map(([h, links]) => (

@@ -185,7 +185,7 @@ export const IMPLEMENTER: Partner = { id: "pih", name: "Plus Incubation Hub" };
  * Framework v1.0 says Wednesday 28 October 2026. Until the programme team confirms, set FINALE_DATE_LABEL on the host
  * (e.g. FINALE_DATE_LABEL="Wednesday 28 October 2026") or "To be announced"; no code change needed.
  */
-export function finaleLabel(): string { return process.env.FINALE_DATE_LABEL?.trim() || "Thursday 10 December 2026"; }
+export function finaleLabel(): string { return process.env.FINALE_DATE_LABEL?.trim() || "Wednesday 28 October 2026"; }
 
 export const TIMELINE = [
   { label: "Applications open", date: "2 October 2026" },
