@@ -32,7 +32,7 @@ export function MentorTable() {
   useEffect(() => { void load(); }, [load]);
   if (error) return <ErrorState message="We couldn't load the mentor applications right now. Please try again." onRetry={load} />;
   if (!rows) return <LoadingState label="Loading mentor applications" rows={5} />;
-  if (rows.length === 0) return <EmptyState title="No mentor applications yet." body="Applications from the Call for Mentors page will appear here." />;
+  if (rows.length === 0) return <EmptyState title="No mentor applications yet." body="Applications from the Call for Experts page will appear here." />;
   return (
     <div className="overflow-x-auto rounded-card border border-paper-line bg-white">
       <table className="w-full min-w-[900px] text-sm">

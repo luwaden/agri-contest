@@ -42,7 +42,7 @@ export const KNOWLEDGE: Knowledge[] = [
   { id: "free", audience: "public", q: "Is there a fee to apply?", keywords: ["fee", "pay", "payment", "cost", "free", "charge", "money", "scam"],
     a: () => `No payment is required to apply or to progress. If anyone asks you for money in connection with the contest, report it to ${email}.` },
   { id: "panel", audience: "public", q: "How can I become a mentor, judge or reviewer?", keywords: ["mentor", "judge", "reviewer", "review", "volunteer", "panel", "expert", "join"],
-    a: () => "Open the \"Join the panel\" page (Call for mentors, judges and reviewers) and answer a few short questions. The programme team reviews every application and tells you your role." },
+    a: () => "Open the \"Join the panel\" page (Call for Experts, judges and reviewers) and answer a few short questions. The programme team reviews every application and tells you your role." },
   { id: "privacy", audience: "public", q: "How is my information used?", keywords: ["privacy", "data", "personal", "information", "protect", "consent", "safe", "ndpa"],
     a: () => "Your information is used to assess applications, select participants and monitor the programme. Only authorised programme staff can see it. See the Privacy notice page for details." },
   { id: "contact", audience: "public", q: "How do I contact the programme team?", keywords: ["contact", "email", "help", "support", "reach", "phone", "question", "problem", "issue"],
