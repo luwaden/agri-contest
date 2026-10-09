@@ -51,8 +51,8 @@ export function SiteFooter({ full = true }: { full?: boolean }) {
           </div>
           <div className="border-t border-dashed border-primary/30 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
             <h2 className="text-xs font-bold uppercase tracking-[0.16em] !text-ink-muted">Implemented by</h2>
-            <div className="mt-4 flex h-20 items-center justify-center rounded-tile border border-paper-line bg-white px-5 sm:w-56">
-              <PartnerLogo partner={IMPLEMENTER} box className="h-12 w-full" />
+          <div className="mt-4 flex h-28 items-center justify-center rounded-tile border border-paper-line bg-white px-4 sm:w-72">
+  <PartnerLogo partner={IMPLEMENTER} box className="h-20 w-full" />
             </div>
           </div>
         </div>

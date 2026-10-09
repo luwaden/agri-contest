@@ -178,7 +178,7 @@ export const FOOTER_PARTNERS: Partner[] = [
 ];
 
 /** Footer, right side. LOGO NOT YET SUPPLIED: add the file to /public/partners and set `logo`, `w`, `h` here. */
-export const IMPLEMENTER: Partner = { id: "pih", name: "Plus Incubation Hub" };
+export const IMPLEMENTER: Partner = { id: "pih", name: "Plus Incubation Hub", logo: "/partners/pih-landscape.png", w: 1000, h: 500 };
 
 /** Grand Finale date shown on the site. ONE place. Confirmed by the programme team: Thursday 29 October 2026.
  * FINALE_DATE_LABEL on the host still overrides it (remove that setting on Vercel if it holds an older date). */
