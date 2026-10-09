@@ -7,7 +7,7 @@ import { Reveal } from "@/components/ui/motion";
 import { PANEL_PAGE } from "@/config/mentors";
 
 export const metadata: Metadata = {
-  title: "Call for Mentors, Judges & Reviewers",
+  title: "Call for Experts: Mentors, Judges & Reviewers",
   description: "Share your experience with young agripreneurs. Apply to serve as a mentor, judge or reviewer for the AGRA–SMEDAN Youth Agri-Innovation Contest.",
   alternates: { canonical: "/mentors" },
 };
@@ -18,7 +18,7 @@ export default function PanelPage() {
       <section className="grid-bg relative overflow-hidden bg-white">
         <Waves className="pointer-events-none absolute -right-32 -top-20 h-[560px] w-[560px]" />
         <div className="container-page relative py-14 sm:py-20">
-          <p className="bubble inline-block rounded-2xl bg-azure px-5 py-2 text-base font-bold text-white">Call for the panel</p>
+          <p className="bubble inline-block rounded-2xl bg-azure px-5 py-2 text-base font-bold text-white">Call for Experts</p>
           <h1 className="mt-7 max-w-3xl font-display text-display-xl !font-extrabold text-primary">Mentors, judges <span className="text-azure">and reviewers.</span></h1>
           <p className="mt-5 max-w-2xl text-lg text-ink-soft sm:text-xl">{PANEL_PAGE.intro}</p>
           <div className="mt-8"><a href="#panel-form" className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-base font-semibold text-white transition hover:bg-primary-800">Apply in 2 minutes</a></div>
@@ -37,7 +37,7 @@ export default function PanelPage() {
           </div>
           <Reveal><div className="mt-4 grid gap-4 md:grid-cols-2">
             <PrimaryCard eyebrow="Ground rules" title="Fair and on the record"><div className="mt-2 text-white"><BulletList items={[...PANEL_PAGE.rules]} /></div></PrimaryCard>
-            <InfoCard tone="primary" className="!bg-paper-warm !text-ink" eyebrow="Time" title={<span className="text-primary">Agreed with you</span>}>{PANEL_PAGE.commitment}</InfoCard>
+            <InfoCard tone="light" eyebrow="Time" title={<span className="text-primary">Agreed with you</span>}>{PANEL_PAGE.commitment}</InfoCard>
           </div></Reveal>
         </div>
       </section>

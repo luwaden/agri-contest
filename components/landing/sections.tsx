@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LinkButton } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/motion";
 import { BlueCard, BulletList, GreenCard, InfoCard, ProgrammeStat, YellowCard } from "@/components/ui/cards";
-import { PROGRAMME, TIMELINE } from "@/config/programme";
+import { JOURNEY, PROGRAMME, TIMELINE } from "@/config/programme";
 import { windowSummary } from "@/lib/window";
 import { ApplicationStatus } from "./ApplicationStatus";
 import { AlliedArt, MaizeArt, RiceArt, SoybeanArt } from "./art";
@@ -112,28 +112,16 @@ export function ValueChains() {
 }
 
 export function HowItWorks() {
-  const w = windowSummary();
-  const steps: Array<[string, string, "yellow" | "green" | "blue" | "primary"]> = [
-    ["Apply", "Three short stages online. Save and continue any time.", "yellow"],
-    ["Screening", "The strongest applications are shortlisted to a Top 100.", "green"],
-    ["Pitch", "Shortlisted applicants pitch to reach the Top 30.", "blue"],
-    ["Grand Finale", `A live final and Deal Room (${TIMELINE[4].date}) selects ten winners.`, "primary"],
-  ];
+  const tones = ["yellow", "green", "blue", "light", "primary"] as const;
   return (
     <ProgrammeSection id="how-it-works" eyebrow="How it works" title="From application to award.">
-      <ol className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {steps.map(([t, d, tone], i) => (
-          <Reveal as="li" key={t} delay={i * 90}>
-            <InfoCard tone={tone} className="h-full" eyebrow={`Step ${i + 1}`} title={t}>{d}</InfoCard>
+      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {JOURNEY.map((j, i) => (
+          <Reveal as="li" key={j.step} delay={i * 90}>
+            <InfoCard tone={tones[i]} className="h-full" eyebrow={j.date} title={j.step}>{j.note}</InfoCard>
           </Reveal>
         ))}
       </ol>
-      <div className="dash-line mt-12" aria-hidden="true" />
-      <dl className="mt-6 grid gap-6 sm:grid-cols-3">
-        {[{ label: "Applications open", date: w.openLabel }, { label: "Applications close", date: w.closeLabel }, { label: TIMELINE[4].label, date: TIMELINE[4].date }].map((t) => (
-          <div key={t.label}><dt className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t.label}</dt><dd className="mt-1 font-display text-lg text-primary">{t.date}</dd></div>
-        ))}
-      </dl>
     </ProgrammeSection>
   );
 }
@@ -146,12 +134,12 @@ export function MentorCTA() {
         <Reveal>
           <div className="relative grid items-center gap-6 overflow-hidden rounded-[1.75rem] bg-azure p-7 text-white sm:p-10 lg:grid-cols-[1.4fr_1fr]">
             <div>
-              <p className="eyebrow !text-sun">Call for the panel</p>
-              <h2 className="mt-3 font-display text-display-lg !text-white">Mentor, judge or review: help young agripreneurs grow.</h2>
-              <p className="mt-3 max-w-xl text-base text-white/90">Mentors, Judges and Reviewers: Help Nigeria’s young Agri-preneurs grow. If you have experience in Agricultural businesses, finance or Entreprrise support and BDSPs...</p>
+              <p className="eyebrow !text-sun">Call for Experts</p>
+              <h2 className="mt-3 font-display text-display-lg !text-white">Mentors, Judges and Reviewers: help young agripreneurs grow.</h2>
+              <p className="mt-3 max-w-xl text-base text-white/90">If you have experience in agribusiness, finance or enterprise support, we would like to hear from you.</p>
             </div>
             <div className="lg:justify-self-end">
-              <LinkButton href="/mentors" className="!rounded-full !bg-sun !px-7 !py-3 text-sm !text-night hover:!bg-lime">Join the experts</LinkButton>
+              <LinkButton href="/mentors" className="!rounded-full !bg-sun !px-7 !py-3 text-sm !text-night hover:!bg-lime">Call for Experts</LinkButton>
             </div>
           </div>
         </Reveal>

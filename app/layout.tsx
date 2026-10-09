@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: { type: "website", siteName: PROGRAMME.name, title: PROGRAMME.name, description: PROGRAMME.tagline, locale: "en_NG" },
   twitter: { card: "summary", title: PROGRAMME.name, description: PROGRAMME.tagline },
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#005937" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#005937", colorScheme: "light" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

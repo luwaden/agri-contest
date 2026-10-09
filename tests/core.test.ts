@@ -102,7 +102,7 @@ test("reference numbers are non-sequential and well-formed", () => {
 
 test("window status driven by dates", () => {
   assert.equal(windowSummary(new Date("2026-09-29T09:00:00Z")).status, "OPENING_SOON");
-  assert.equal(windowSummary(new Date("2026-10-02T00:00:01+01:00")).status, "OPEN");
+  assert.equal(windowSummary(new Date("2026-10-08T00:00:01+01:00")).status, "OPEN");
   assert.equal(windowSummary(new Date("2026-10-16T23:59:00+01:00")).status, "OPEN");
   assert.equal(windowSummary(new Date("2026-10-17T00:00:01+01:00")).status, "CLOSED");
 });

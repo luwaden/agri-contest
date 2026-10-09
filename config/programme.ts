@@ -20,7 +20,7 @@ export const PROGRAMME = {
  * Dates are read from env so they can change without a code edit. Times are Africa/Lagos (WAT, UTC+1).
  */
 export const APPLICATION_WINDOW_DEFAULTS = {
-  open: "2026-10-02T00:00:00+01:00",
+  open: "2026-10-08T00:00:00+01:00",
   close: "2026-10-16T23:59:59+01:00",
 } as const;
 
@@ -180,18 +180,22 @@ export const FOOTER_PARTNERS: Partner[] = [
 /** Footer, right side. LOGO NOT YET SUPPLIED: add the file to /public/partners and set `logo`, `w`, `h` here. */
 export const IMPLEMENTER: Partner = { id: "pih", name: "Plus Incubation Hub" };
 
-/**
- * Grand Finale date shown on the site. ONE place. The concept note says Thursday 10 December 2026; the Contest Design
- * Framework v1.0 says Wednesday 28 October 2026. Until the programme team confirms, set FINALE_DATE_LABEL on the host
- * (e.g. FINALE_DATE_LABEL="Wednesday 28 October 2026") or "To be announced"; no code change needed.
- */
+/** Grand Finale date shown on the site. ONE place. Confirmed by the programme team: Thursday 29 October 2026.
+ * FINALE_DATE_LABEL on the host still overrides it (remove that setting on Vercel if it holds an older date). */
 export function finaleLabel(): string { return process.env.FINALE_DATE_LABEL?.trim() || "Thursday 29 October 2026"; }
 
+/** Programme journey shown in "From application to award". Dates confirmed by the programme team. */
+export const JOURNEY = [
+  { step: "Apply", date: "8 to 16 October", note: "Apply online in three short stages. Save and continue any time." },
+  { step: "Nationwide Training", date: "17 October", note: "Virtual training for all applicants." },
+  { step: "In-person Training", date: "21 to 22 October", note: "Two days of in-person training in Niger, Nasarawa and Kaduna." },
+  { step: "Pitch & Grand Finale", date: "29 October", note: "Hybrid: finalists pitch live, in the room and online." },
+  { step: "National Showcase & Award", date: "8 to 10 November", note: "The national showcase and award ceremony in Lagos." },
+] as const;
+
 export const TIMELINE = [
-  { label: "Applications open", date: "2 October 2026" },
+  { label: "Applications open", date: "8 October 2026" },
   { label: "Applications close", date: "16 October 2026" },
-  { label: "Round 1: shortlist to Top 100", date: "Announced by programme team" },
-  { label: "Round 2: pitches to Top 30", date: "Announced by programme team" },
-  { label: "Grand Finale and Deal Room", date: finaleLabel() },
+  { label: "Grand Finale", date: finaleLabel() },
 ] as const;
 

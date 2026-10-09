@@ -10,7 +10,7 @@
 @font-face { font-family: "Elza"; font-weight: 800; font-display: swap; src: local("Elza ExtraBold"), local("Elza-ExtraBold"); }
 
 @layer base {
-  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  html { color-scheme: light only; -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   body { @apply bg-white text-ink font-sans antialiased; font-feature-settings: "ss01", "cv11"; }
   /* Brand type rules: headers Bold/ExtraBold at -40 tracking, sub-headers SemiBold at -20, body Regular at 0. */
   h1, h2 { @apply font-extrabold text-leaf-700; letter-spacing: -0.04em; }
