@@ -77,7 +77,7 @@ test("panel (mentor/judge/reviewer) applications send NO email, to anyone", asyn
 test("applicant email links Plus Incubation Hub's website", async () => {
   const { applicantConfirmation } = await load();
   const m = applicantConfirmation({ applicationId: "AGRA-2026-AAAAAA", submittedAt: null, firstName: "Amina", email: "x@example.com" });
-  assert.ok(m.html.includes('href="https://www.plusincubationhub.com"')); assert.match(m.text, /www\.plusincubationhub\.com/);
+  assert.ok(m.html.includes("www.plusincubationhub.com")); assert.ok(!/href="https?:/.test(m.html), "no web links (fewer spam signals)"); assert.match(m.text, /www\.plusincubationhub\.com/);
   assert.ok(!m.html.includes("plusincubationhub@gmail.com") && !m.text.includes("plusincubationhub@gmail.com"));
 });
 

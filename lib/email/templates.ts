@@ -1,5 +1,5 @@
 import { PROGRAMME } from "@/config/programme";
-import { IMPLEMENTER_WEBSITE, IMPLEMENTER_WEBSITE_LABEL } from "@/config/implementer";
+import { IMPLEMENTER_WEBSITE_LABEL } from "@/config/implementer";
 import { replyTo, type EmailMessage } from "./send";
 
 /**
@@ -7,7 +7,6 @@ import { replyTo, type EmailMessage } from "./send";
  * programme team reviews all applications and contacts shortlisted applicants, and one application per email address.
  * No dates, prizes or selection numbers are promised here. The applicant's answers are never repeated in an email.
  */
-const site = () => (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const when = (iso: string | null | undefined) =>
   new Date(iso || Date.now()).toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " (WAT)";
@@ -22,7 +21,7 @@ function layout(title: string, paragraphs: string[], ref: string): string {
 <div style="margin:0 0 18px;padding:12px 14px;background:#f0f7e6;border-radius:8px;font-size:14px">Reference number<br><strong style="font-family:Consolas,monospace;font-size:20px;letter-spacing:.5px">${esc(ref)}</strong></div>
 ${body}
 </div>
-<p style="font-size:12px;color:#5b6b60;line-height:1.5;margin:14px 4px 0">You are receiving this because this email address was used on the ${esc(PROGRAMME.shortName)} website${site() ? ` (${esc(site())})` : ""}. Delivered by ${esc(PROGRAMME.deliveredBy)}, <a href="${IMPLEMENTER_WEBSITE}" style="color:#5b6b60">${IMPLEMENTER_WEBSITE_LABEL}</a>.</p>
+<p style="font-size:12px;color:#5b6b60;line-height:1.5;margin:14px 4px 0">You are receiving this because you applied to the ${esc(PROGRAMME.name)} with this email address. Delivered by ${esc(PROGRAMME.deliveredBy)} (${IMPLEMENTER_WEBSITE_LABEL}).</p>
 </div></body></html>`;
 }
 

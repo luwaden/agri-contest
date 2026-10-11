@@ -5,6 +5,7 @@ import { REFERENCE_PATTERN } from "@/lib/reference";
 import { PROGRAMME } from "@/config/programme";
 import { CopyReference } from "@/components/application/CopyReference";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { emailProvider } from "@/lib/email/send";
 
 export const metadata: Metadata = { title: "Application received", robots: { index: false } };
 
@@ -23,6 +24,12 @@ export default async function Success({ searchParams }: { searchParams: Promise<
           <CopyReference value={ref} />
         </div>
         <p className="mt-6 text-lg text-forest-900">Keep this reference number for future communication.</p>
+        {emailProvider() !== "off" && (
+          <div className="mt-6 rounded-lg border border-sun/60 bg-sun/15 p-5 text-forest-900" role="note">
+            <p className="font-semibold">We have also sent a confirmation email with this reference number.</p>
+            <p className="mt-2 text-ink-soft">It comes from <strong className="text-forest-900">{PROGRAMME.contactEmail}</strong> and can take a few minutes. If it is not in your inbox, please check your <strong className="text-forest-900">Spam</strong> or <strong className="text-forest-900">Promotions</strong> folder and mark it as &ldquo;Not spam&rdquo;, so our future messages to you arrive safely. Adding {PROGRAMME.contactEmail} to your contacts also helps.</p>
+          </div>
+        )}
         <ul className="mt-6 space-y-2 text-ink-soft">
           <li>The programme team will review all applications after the call closes.</li>
           <li>Submitting an application does not guarantee selection.</li>
