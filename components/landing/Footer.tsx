@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FOOTER_PARTNERS, IMPLEMENTER, PROGRAMME } from "@/config/programme";
 import { PartnerLogo } from "@/components/ui/PartnerLogo";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { IMPLEMENTER_WEBSITE, IMPLEMENTER_WEBSITE_LABEL } from "@/config/implementer";
 
 const FULL_COLS: Array<[string, Array<[string, string]>]> = [
   ["Programme", [["Overview", "/#programme"], ["Benefits", "/#benefits"], ["Value chains", "/#value-chains"], ["How it works", "/#how-it-works"]]],
@@ -23,7 +24,7 @@ export function SiteFooter({ full = true }: { full?: boolean }) {
           <Wordmark tone="onDark" size="lg" />
           <p className="mt-5 max-w-sm text-white/85">{PROGRAMME.tagline}</p>
           <p className="mt-4 font-semibold text-lime">{PROGRAMME.hashtag}</p>
-          <p className="mt-6 text-sm text-white/85">Enquiry: <a className="font-semibold text-white underline underline-offset-2" href={`mailto:${PROGRAMME.contactEmail}`}>{PROGRAMME.contactEmail}</a></p>
+          <p className="mt-6 text-sm text-white/85">Contact: <a className="font-semibold text-white underline underline-offset-2" href={`mailto:${PROGRAMME.contactEmail}`}>{PROGRAMME.contactEmail}</a></p>
         </div>
         <nav aria-label="Footer" className={`grid gap-8 ${full ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           {COLS.map(([h, links]) => (
@@ -51,9 +52,11 @@ export function SiteFooter({ full = true }: { full?: boolean }) {
           </div>
           <div className="border-t border-dashed border-primary/30 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
             <h2 className="text-xs font-bold uppercase tracking-[0.16em] !text-ink-muted">Implemented by</h2>
-          <div className="mt-4 flex h-28 items-center justify-center rounded-tile border border-paper-line bg-white px-4 sm:w-72">
-  <PartnerLogo partner={IMPLEMENTER} box className="h-20 w-full" />
-            </div>
+            <a href={IMPLEMENTER_WEBSITE} target="_blank" rel="noopener noreferrer" aria-label={`${IMPLEMENTER.name} website (opens in a new tab)`}
+              className="mt-4 flex h-28 items-center justify-center rounded-tile border border-paper-line bg-white px-4 transition-colors hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-72">
+              <PartnerLogo partner={IMPLEMENTER} box className="h-20 w-full" />
+            </a>
+            <a href={IMPLEMENTER_WEBSITE} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm font-semibold text-azure underline underline-offset-2 hover:text-primary">{IMPLEMENTER_WEBSITE_LABEL}</a>
           </div>
         </div>
         <p className="mt-8 text-center text-xs text-white/70">© {new Date().getFullYear()} {PROGRAMME.name}. All partner logos are the property of their respective organisations.</p>

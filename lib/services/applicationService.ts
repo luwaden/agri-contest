@@ -8,6 +8,7 @@ import { deleteDraft } from "@/lib/services/draftService";
 import { kv, redisConfigured } from "@/lib/kv";
 import { createHash } from "node:crypto";
 import { mirrorToGoogleScript } from "@/lib/integrations/googleScript";
+import { emailApplicant } from "@/lib/email/notify";
 import { cloudinaryConfigured, parseCloudinaryUrl, tagFiles } from "@/lib/cloudinary/client";
 
 /** Framework-free: takes plain data, returns a plain result. Next.js route handlers (and later Express) just translate it to HTTP. */
@@ -76,6 +77,7 @@ export async function submitApplication(input: { values: Record<string, unknown>
     const files = application!.documents.map((d) => parseCloudinaryUrl(d.url)).filter((p): p is NonNullable<typeof p> => !!p);
     if (files.length) void tagFiles(files, `app_${applicationId}`).catch((e) => console.error("[cloudinary] tagging failed:", (e as Error).message));
   }
+  emailApplicant({ applicationId, submittedAt: application!.submittedAt, firstName: application!.applicant.firstName, email: application!.applicant.email, businessName: application!.business.businessName });
   void mirrorToGoogleScript("application", { applicationId, submittedAt: application!.submittedAt, state: application!.location.state, applicant: application!.applicant, business: application!.business.businessName });
   return { ok: true, status: 201, data: { applicationId, submittedAt: application!.submittedAt } };
 }

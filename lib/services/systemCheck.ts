@@ -10,6 +10,7 @@ import { getAIProvider } from "@/lib/ai";
 import { APP_VERSION, commit } from "@/lib/version";
 import { hashLooksValid, loadStaff } from "@/lib/auth/users";
 import type { StoreDiagnosis } from "@/lib/repository/types";
+import { emailProvider, emailSetupProblem, replyTo } from "@/lib/email/send";
 
 export interface CheckStep { id: string; label: string; status: "pass" | "warn" | "fail"; detail: string; fix?: string; ms: number }
 const FIX: Record<string, string> = {
@@ -96,6 +97,13 @@ export async function runSystemCheck(actor: string): Promise<{ ok: boolean; vers
 
   steps.push(await step("window", "Application window", async () => {
     const w = windowSummary(); return { status: w.status === "OPEN" ? "pass" : "warn", detail: `${w.range} Status now: ${w.status.replace("_", " ").toLowerCase()}.` };
+  }));
+
+  steps.push(await step("email", "Confirmation emails", async () => {
+    const problem = emailSetupProblem(); const p = emailProvider();
+    if (problem) return { status: "fail", detail: problem, fix: "See docs/EMAIL.md, then redeploy." };
+    if (p === "off") return { status: "warn", detail: "Off: applicants see their reference number on screen but get no email.", fix: "Add GMAIL_USER and GMAIL_APP_PASSWORD (or Resend) as in docs/EMAIL.md, then redeploy." };
+    return { status: "pass", detail: `On, via ${p === "gmail" ? `Gmail (${process.env.GMAIL_USER}, about 500 a day)` : `Resend (from ${process.env.EMAIL_FROM})`}. Only applicants get an email (one confirmation each). Replies go to ${replyTo()}. To send a real test: npm run email:test -- you@example.org` };
   }));
 
   steps.push(await step("ai", "AI assistant", async () => {

@@ -10,7 +10,7 @@ export const PROGRAMME = {
   hashtag: "#AGRASMEDANYouthAgriInnovate",
   refPrefix: "AGRA",
   eligibility: { minAge: 18, maxAge: 35 },
-  contactEmail: "plusincubationhub@gmail.com",
+  contactEmail: "youthagriinnovate@gmail.com",
   deliveredBy: "Plus Incubation Hub Nigeria Limited",
 } as const;
 

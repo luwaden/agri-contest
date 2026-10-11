@@ -16,7 +16,8 @@
     "make-user": "tsx --conditions=react-server scripts/make-user.ts",
     "check:system": "tsx --conditions=react-server scripts/check-system.ts",
     "check:live": "tsx --conditions=react-server scripts/check-live.ts",
-    "preflight": "tsx --conditions=react-server scripts/preflight.ts"
+    "preflight": "tsx --conditions=react-server scripts/preflight.ts",
+    "email:test": "tsx --conditions=react-server scripts/email-test.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
@@ -24,6 +25,7 @@
     "google-auth-library": "^11.1.0",
     "jose": "^6.2.12",
     "next": "^15.5.26",
+    "nodemailer": "10.0.10",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.6.3",
+    "@types/nodemailer": "8.0.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.6.1",
