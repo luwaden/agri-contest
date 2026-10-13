@@ -5,8 +5,9 @@ import type { Application, ApplicationStatus } from "@/types/application";
 import type { ApplicationRepository, AuditEvent, DraftRecord } from "./types";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
 import type { StaffAccount } from "@/types/staff";
+import type { PanelReview } from "@/types/review";
 
-interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[] }
+interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[] }
 const FILE = path.join(process.cwd(), ".data", "dev-store.json");
 
 let queue: Promise<unknown> = Promise.resolve();
@@ -76,4 +77,16 @@ export class LocalRepository implements ApplicationRepository {
   diagnose = async () => ({ ok: true, kind: "local", tabs: { Applications: "ok" as const }, headerOk: null });
   countDrafts = () => serial(async () => (await load()).drafts.length);
   logEvent = (e: AuditEvent) => serial(async () => { const s = await load(); s.events.push(e); await save(s); });
+  getReviews = () => serial(async () => (await load()).reviews ?? []);
+  createReviews = (list: PanelReview[]) => serial(async () => {
+    const s = await load(); s.reviews ??= [];
+    const have = new Set(s.reviews.map((r) => `${r.applicationId}|${r.panelEmail}`)); let added = 0;
+    for (const r of list) { const k = `${r.applicationId}|${r.panelEmail}`; if (have.has(k)) continue; have.add(k); s.reviews.push(r); added++; }
+    await save(s); return added;
+  });
+  updateReview = (id: string, patch: Partial<PanelReview>) => serial(async () => {
+    const s = await load(); const r = (s.reviews ?? []).find((x) => x.reviewId === id); if (!r) return null;
+    Object.assign(r, patch, { reviewId: r.reviewId, applicationId: r.applicationId, panelEmail: r.panelEmail, updatedAt: patch.updatedAt ?? new Date().toISOString() });
+    await save(s); return { ...r };
+  });
 }

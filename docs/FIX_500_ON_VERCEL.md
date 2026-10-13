@@ -3,7 +3,7 @@
 **What the 500 means:** the website could not reach its data store (your Google Sheet). It works on your computer because your computer has the settings in `.env`. **Vercel does not read your `.env` file**: every setting must be added in Vercel itself.
 
 ## Step 0: is the NEW code actually live?
-Open `https://agri-contest.vercel.app/api/health`. The current release shows `"version":"2026.10.08.2"`, a `"features"` list and `"redis"`. **If you do not see `"version"`, the old code is still deployed**: push/upload the new code and redeploy, otherwise none of the checks below exist.
+Open `https://agri-contest.vercel.app/api/health`. The current release shows `"version":"2026.10.11"`, a `"features"` list and `"redis"`. **If you do not see `"version"`, the old code is still deployed**: push/upload the new code and redeploy, otherwise none of the checks below exist.
 
 ## The best test: Admin → System check
 Sign in, open **Admin → System check**, press **Run system check**. In about 5 to 20 seconds it tests, on the live server, everything an application needs:

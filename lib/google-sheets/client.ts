@@ -41,6 +41,10 @@ export const sheets = {
   async append(sheet: string, row: string[]) {
     await call(`/values/${enc(sheet)}!A1:append`, "POST", { values: [row] }, { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
   },
+  async appendMany(sheet: string, rows: string[][]) {
+    for (let i = 0; i < rows.length; i += 500)
+      await call(`/values/${enc(sheet)}!A1:append`, "POST", { values: rows.slice(i, i + 500) }, { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
+  },
   async updateRow(sheet: string, rowNumber: number, row: string[]) {
     await call(`/values/${enc(`${sheet}!A${rowNumber}`)}`, "PUT", { values: [row] }, { valueInputOption: "RAW" });
   },

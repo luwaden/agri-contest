@@ -9,7 +9,9 @@ import { REFERENCE_PATTERN } from "@/lib/reference";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { StatusSelect } from "@/components/admin/StatusSelect";
 import { PrintButton } from "@/components/admin/PrintButton";
-import { DEFAULT_CRITERIA } from "@/config/scoring";
+import { ACTIVE_CRITERIA } from "@/lib/judging";
+import { listPanelists, reviewsForApplication } from "@/lib/services/reviewService";
+import { PanelReviewsAdmin } from "@/components/admin/judging/PanelReviewsAdmin";
 import * as L from "@/lib/labels";
 import { Fragment } from "react";
 
@@ -34,6 +36,7 @@ export default async function ApplicationDetail({ params }: { params: Promise<{ 
   const { application: a, demo } = await loadApplication(id);
   if (!a) notFound();
   const b = a.business, i = a.impact;
+  const [reviews, panelists] = await Promise.all([reviewsForApplication(a.applicationId), can(user.role, "judges:manage") ? listPanelists() : Promise.resolve([])]);
   return (
     <PortalShell>
     <div className="space-y-6">
@@ -82,10 +85,7 @@ export default async function ApplicationDetail({ params }: { params: Promise<{ 
         ["Status", L.formatDateTime(a.submittedAt) === "—" ? a.submissionStatus : a.submissionStatus], ["Submitted", L.formatDateTime(a.submittedAt)], ["Created", L.formatDateTime(a.metadata.createdAt)],
         ["Last updated", L.formatDateTime(a.metadata.updatedAt)], ["Source", a.metadata.source], ["Declaration accepted", a.declaration.accepted ? `Yes · ${L.formatDateTime(a.declaration.acceptedAt)}` : "No"],
       ]} />
-      <Section title="Scoring" rows={[
-        ["Average score", a.score ?? "Not scored yet"],
-        ["Rubric", `${DEFAULT_CRITERIA.filter((c) => c.active).length} draft criteria configured. Judging opens in a later batch, and scores will be shown per judge.`],
-      ]} />
+      <PanelReviewsAdmin applicationId={a.applicationId} reviews={reviews} panelists={panelists} criteria={ACTIVE_CRITERIA.map((c) => ({ id: c.id, name: c.name }))} canManage={can(user.role, "judges:manage") && !demo} />
     </div>
     </PortalShell>
   );

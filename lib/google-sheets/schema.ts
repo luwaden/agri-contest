@@ -1,6 +1,7 @@
 import type { Application } from "@/types/application";
 import { MENTOR_HEADERS } from "./mentorSchema";
 import { STAFF_HEADERS } from "./staffSchema";
+import { REVIEW_HEADERS } from "./reviewSchema";
 
 export const SHEETS = {
   applications: "Applications",
@@ -14,6 +15,7 @@ export const SHEETS = {
   adminUsers: "Admin Users",
   judges: "Judges",
   configuration: "Configuration",
+  reviews: "Panel Reviews",
 } as const;
 
 type Kind = "s" | "n" | "b" | "l" | "j";
@@ -64,6 +66,7 @@ export const HEADERS = {
   [SHEETS.adminUsers]: STAFF_HEADERS,
   [SHEETS.judges]: ["judge_id", "name", "email", "active", "conflict_declared", "assigned_application_ids"],
   [SHEETS.configuration]: ["key", "value", "updated_at", "updated_by"],
+  [SHEETS.reviews]: REVIEW_HEADERS,
 } as const;
 
 const get = (obj: any, path: string) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);

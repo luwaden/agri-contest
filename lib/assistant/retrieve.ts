@@ -7,10 +7,12 @@ const tokens = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").spl
 export function rank(question: string, role?: string): Array<{ entry: Knowledge; score: number }> {
   const allowed = new Set(audiencesFor(role));
   const q = question.toLowerCase(); const qt = new Set(tokens(question));
+  const own = role === "ADMIN" || role === "COORDINATOR" ? "admin" : role === "JUDGE" || role === "REVIEWER" ? "panel" : "public";
   return KNOWLEDGE.filter((k) => allowed.has(k.audience)).map((entry) => {
     let score = 0;
     for (const kw of entry.keywords) if (q.includes(kw)) score += kw.includes(" ") ? 4 : 3;
     for (const t of tokens(entry.q)) if (qt.has(t)) score += 1;
+    if (score > 0 && entry.audience === own) score += 2;   // a judge asking "how do I score an application" means scoring, not applying
     return { entry, score };
   }).filter((r) => r.score > 0).sort((a, b) => b.score - a.score);
 }

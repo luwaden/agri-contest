@@ -1,6 +1,7 @@
 import type { Application, ApplicationStatus } from "@/types/application";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
 import type { StaffAccount } from "@/types/staff";
+import type { PanelReview } from "@/types/review";
 
 export interface StoreDiagnosis {
   ok: boolean; kind: string;
@@ -44,6 +45,11 @@ export interface ApplicationRepository {
   /** Throws DUPLICATE_EMAIL if the email already exists. */
   createStaff(a: StaffAccount): Promise<void>;
   updateStaff(email: string, patch: Partial<Pick<StaffAccount, "name" | "role" | "active" | "note" | "passwordHash">>): Promise<StaffAccount | null>;
+  // Panel reviews: one row per (application, judge/reviewer) = the assignment AND that person's score sheet.
+  getReviews(): Promise<PanelReview[]>;
+  /** Adds many at once. Rows whose (application, panel member) pair already exists are skipped; returns how many were added. */
+  createReviews(reviews: PanelReview[]): Promise<number>;
+  updateReview(reviewId: string, patch: Partial<Omit<PanelReview, "reviewId" | "applicationId" | "panelEmail">>): Promise<PanelReview | null>;
   /** Cheap, read-only check used by /api/health?check=store. Never returns secrets. */
   diagnose(): Promise<StoreDiagnosis>;
   logEvent(event: AuditEvent): Promise<void>;

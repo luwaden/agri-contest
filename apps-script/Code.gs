@@ -153,6 +153,27 @@ var TABS = {
     "value",
     "updated_at",
     "updated_by"
+  ],
+  "Panel Reviews": [
+    "review_id",
+    "application_id",
+    "panel_email",
+    "panel_name",
+    "panel_role",
+    "status",
+    "assigned_at",
+    "assigned_by",
+    "score_originality",
+    "score_feasibility",
+    "score_scalability",
+    "score_impact",
+    "score_market",
+    "weighted_total",
+    "overall_comment",
+    "criterion_comments_json",
+    "conflict_note",
+    "updated_at",
+    "submitted_at"
   ]
 };
 

@@ -24,7 +24,7 @@ Open Vercel → your project → **Deployments**:
 ```
 npm run check:live -- https://agri-contest.vercel.app
 ```
-The first line must say the live version matches your local version (currently `2026.10.08.2`). You can also open `/api/health` and look for `"version"`.
+The first line must say the live version matches your local version (currently `2026.10.11`). You can also open `/api/health` and look for `"version"`.
 
 ## Changing settings (environment variables)
 After any change in **Settings → Environment Variables**, go to **Deployments → ⋯ → Redeploy**. Settings are only read when the site is built.
