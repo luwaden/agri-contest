@@ -5,5 +5,5 @@ node_modules
 .env.local
 *.tsbuildinfo
 next-env.d.ts
-
+# Local backups of the live sheet (personal data): never commit
 backups/

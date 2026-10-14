@@ -6,6 +6,8 @@ import type { SheetTransport } from "./transport";
 import { HEADERS, SHEETS, applicationToRow, describeHeaderProblem, rowToApplication } from "./schema";
 import { mentorToRow, rowToMentor } from "./mentorSchema";
 import { rowToStaff, staffToRow } from "./staffSchema";
+import { reviewToRow, rowToReview } from "./reviewSchema";
+import type { PanelReview } from "@/types/review";
 import type { StaffAccount } from "@/types/staff";
 import { classifyError } from "@/lib/http";
 import type { StoreDiagnosis } from "@/lib/repository/types";
@@ -110,6 +112,31 @@ export class SheetsRepository implements ApplicationRepository {
     return next;
   }
 
+  private async reviewRows() {
+    try { return (await this.sheets.read(SHEETS.reviews)).slice(1); }
+    catch (e) { if (classifyError(e) === "SHEET_TAB_MISSING") return []; throw e; }   // no tab yet = nobody assigned yet
+  }
+  async getReviews(): Promise<PanelReview[]> {
+    return (await this.reviewRows()).map(rowToReview).filter((r): r is PanelReview => r !== null);
+  }
+  async createReviews(list: PanelReview[]) {
+    const have = new Set((await this.getReviews()).map((r) => `${r.applicationId}|${r.panelEmail}`));
+    const fresh = list.filter((r) => { const k = `${r.applicationId}|${r.panelEmail}`; if (have.has(k)) return false; have.add(k); return true; });
+    if (!fresh.length) return 0;
+    const rows = fresh.map(reviewToRow);
+    if (this.sheets.appendMany) await this.sheets.appendMany(SHEETS.reviews, rows);
+    else for (const r of rows) await this.sheets.append(SHEETS.reviews, r);
+    return fresh.length;
+  }
+  async updateReview(reviewId: string, patch: Partial<PanelReview>) {
+    const rows = await this.reviewRows(); const i = rows.findIndex((r) => r[0] === reviewId);
+    if (i === -1) return null;
+    const cur = rowToReview(rows[i]); if (!cur) return null;
+    const next: PanelReview = { ...cur, ...patch, reviewId: cur.reviewId, applicationId: cur.applicationId, panelEmail: cur.panelEmail, updatedAt: patch.updatedAt ?? new Date().toISOString() };
+    await this.sheets.updateRow(SHEETS.reviews, i + 2, reviewToRow(next));
+    return next;
+  }
+
   async getEvents(limit = 200) {
     return (await this.sheets.read(SHEETS.events)).slice(1).filter((r) => r[0]).slice(-limit).reverse()
       .map((r) => ({ at: r[0], applicationId: r[1], actor: r[2], action: r[3], detail: r[4] ?? "" }));
@@ -118,7 +145,7 @@ export class SheetsRepository implements ApplicationRepository {
   async diagnose(): Promise<StoreDiagnosis> {
     const tabs: StoreDiagnosis["tabs"] = {}; let code: string | undefined; let headerOk: boolean | null = null; const headerProblems: string[] = [];
     const headerIssues: Record<string, string | null> = {};
-    for (const t of [SHEETS.applications, SHEETS.drafts, SHEETS.events, SHEETS.mentors, SHEETS.adminUsers]) {
+    for (const t of [SHEETS.applications, SHEETS.drafts, SHEETS.events, SHEETS.mentors, SHEETS.adminUsers, SHEETS.reviews]) {
       try {
         const rows = await this.sheets.read(t); tabs[t] = "ok";
         const want = [...HEADERS[t as keyof typeof HEADERS]], got = rows[0] ?? [];
@@ -128,7 +155,10 @@ export class SheetsRepository implements ApplicationRepository {
           want.forEach((h, i) => { if (got[i] !== h && headerProblems.length < 4) headerProblems.push(`column ${i + 1} should be "${h}" but is "${got[i] ?? "(blank)"}"`); });
           headerOk = headerProblems.length === 0;
         }
-      } catch (e) { const c = classifyError(e); tabs[t] = c === "SHEET_TAB_MISSING" ? "missing" : "error"; code ??= c; }
+      } catch (e) {
+        const c = classifyError(e); tabs[t] = c === "SHEET_TAB_MISSING" ? "missing" : "error";
+        if (!(t === SHEETS.reviews && c === "SHEET_TAB_MISSING")) code ??= c;   // judging tab is optional until setup:sheets adds it
+      }
     }
     // Only the Applications header can break the dashboard; other tabs' headers are for people reading the sheet.
     return { ok: !code && headerOk !== false, kind: "sheets", tabs, headerOk, headerProblems, headerIssues, code };

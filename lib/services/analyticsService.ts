@@ -6,15 +6,34 @@ import type { Application } from "@/types/application";
 import { countDrafts } from "./draftService";
 
 const isDemo = () => process.env.NEXT_PUBLIC_DEMO_MODE === "true" && process.env.NODE_ENV !== "production";
-/** Admin screens re-query on every filter change. A short per-instance cache keeps them fast and protects the Sheets quota. */
+/**
+ * Admin screens re-query on every filter change. A short per-instance cache keeps them fast and protects the Sheets quota.
+ * Screens that ask at the same moment share one download. If Google does not answer, a copy up to 10 minutes old is used
+ * (and logged) rather than failing the page.
+ */
 let cache: { at: number; rows: Application[] } | null = null;
+let loading: Promise<Application[]> | null = null;
 const TTL_MS = (Number(process.env.ADMIN_CACHE_SECONDS) || 15) * 1000;
-export const invalidateAdminCache = () => { cache = null; };
+const STALE_OK_MS = 10 * 60_000;
+export const invalidateAdminCache = () => { cache = null; loading = null; };
 const all = async (): Promise<Application[]> => {
   if (isDemo()) return demoApplications();
   if (cache && Date.now() - cache.at < TTL_MS) return cache.rows;
-  const rows = await getRepository().getApplications();
-  cache = { at: Date.now(), rows }; return rows;
+  let p = loading;
+  if (!p) {
+    const q: Promise<Application[]> = getRepository().getApplications().then((rows) => { if (loading === q) cache = { at: Date.now(), rows }; return rows; });
+    const done = () => { if (loading === q) loading = null; };
+    q.then(done, done);
+    loading = p = q;
+  }
+  try { return await p; }
+  catch (e) {
+    if (cache && Date.now() - cache.at < STALE_OK_MS) {
+      console.warn(`[applications] Google Sheets did not answer (${String((e as Error)?.message ?? e).slice(0, 120)}). Using the copy from ${Math.round((Date.now() - cache.at) / 1000)} s ago.`);
+      return cache.rows;
+    }
+    throw e;
+  }
 };
 const submittedOnly = (a: Application[]) => a.filter((x) => x.submissionStatus !== "DRAFT");
 

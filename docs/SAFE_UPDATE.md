@@ -3,6 +3,7 @@
 **What this update changes in your data:** it adds new columns at the **end** of two tabs and creates any missing tabs.
 - **Mentors** gets `first_name` and `last_name`.
 - **Admin Users** gets `password_hash` and `updated_at`.
+- A new **Panel Reviews** tab is created (judges' and reviewers' assignments and score sheets). Until it exists, the site keeps working and the Judging page simply shows nothing assigned.
 
 It never moves, renames or deletes a column, and never edits or deletes an applicant's row. **The Applications tab does not change at all.**
 
@@ -83,7 +84,7 @@ Vercel builds the new version while the old one keeps serving visitors, then swi
 ```
 npm run check:live -- https://agri-contest.vercel.app --email you@example.org
 ```
-- The live version must be **2026.10.09**, with no ✘ items.
+- The live version must be **2026.10.13**, with no ✘ items.
 - The **Applications** tab has the same number of rows as before (compare with the preflight's "Records checked" line).
 - Submit one test application from your phone, find its row, then delete that row (keep row 1). Do the same for a panel application.
 

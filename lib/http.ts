@@ -66,6 +66,6 @@ export function classifyError(e: unknown): string {
 export const serverError = (e: unknown) => {
   const code = classifyError(e);
   const ref = Math.random().toString(36).slice(2, 8).toUpperCase();
-  console.error(`[api] ref=${ref} code=${code}`, e);
+  console.error(`[api] ref=${ref} code=${code}`, String((e as Error)?.message ?? e).slice(0, 500));   // never the raw object: it can be huge
   return NextResponse.json({ message: "Something went wrong on our side. Please try again in a moment.", code, ref }, { status: 500 });
 };

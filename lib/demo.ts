@@ -31,6 +31,7 @@ export function demoApplications(count = 64): Application[] {
       businessName: `Demo Agribusiness ${i + 1}`, jobsCreated: String(Math.floor(r() * 20)), farmersReached: String(Math.floor(r() * 500)),
     };
     if (values.disability === "YES") values.disabilityType = "PHYSICAL";
+    if (values.valueChain === "OTHER") (values as Record<string, unknown>).valueChainOther = "Cassava";   // "Other" needs its detail, or that stage would be dropped
     const code = Array.from({ length: 6 }, () => CODE[Math.floor(r() * CODE.length)]).join("");
     const parsed = validateAll(values);
     const app = toApplication(parsed.data, { applicationId: `AGRA-2026-${code}`, status: pick(["SUBMITTED", "SUBMITTED", "UNDER_REVIEW", "SHORTLISTED"] as const), now: new Date(Date.UTC(2026, 9, 2 + Math.floor(r() * 14), 9)), source: "demo" });
