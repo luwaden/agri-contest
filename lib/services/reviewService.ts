@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { getRepository } from "@/lib/repository";
 import { loadApplications } from "@/lib/data";
-import { listStaff } from "@/lib/auth/users";
+import { loadStaff, summarise } from "@/lib/auth/users";
 import { buildResults, checkScoreSheet, panelView, planAssignments, type Panelist } from "@/lib/judging";
 import { isLiveReview, type PanelReview, type PanelRole } from "@/types/review";
 import type { Application, ApplicationStatus } from "@/types/application";
@@ -20,7 +20,8 @@ const TAB_MSG = 'The "Panel Reviews" tab does not exist yet. Run npm run setup:s
 
 /** Judges and reviewers who can be given work: active or invited (not deactivated). */
 export async function listPanelists(): Promise<Panelist[]> {
-  return (await listStaff()).filter((s) => isPanel(s.role) && (s.status === "active" || s.status === "invited"))
+  // The 30-second cached staff list: reading the Admin Users tab on every call used up Google's per-minute quota.
+  return (await loadStaff()).accounts.map(summarise).filter((s) => isPanel(s.role) && (s.status === "active" || s.status === "invited"))
     .map((s) => ({ email: s.email.toLowerCase(), name: s.name, role: s.role as PanelRole }));
 }
 

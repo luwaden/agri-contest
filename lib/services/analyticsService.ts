@@ -11,26 +11,27 @@ const isDemo = () => process.env.NEXT_PUBLIC_DEMO_MODE === "true" && process.env
  * Screens that ask at the same moment share one download. If Google does not answer, a copy up to 10 minutes old is used
  * (and logged) rather than failing the page.
  */
-let cache: { at: number; rows: Application[] } | null = null;
-let loading: Promise<Application[]> | null = null;
-const TTL_MS = (Number(process.env.ADMIN_CACHE_SECONDS) || 15) * 1000;
+// Kept on globalThis so every part of the app shares ONE copy (also under `next dev`, which loads modules per route).
+type AppCache = { cache: { at: number; rows: Application[] } | null; loading: Promise<Application[]> | null };
+const g: AppCache = ((globalThis as { __agraApps?: AppCache }).__agraApps ??= { cache: null, loading: null });
+const TTL_MS = (Number(process.env.ADMIN_CACHE_SECONDS) || 60) * 1000;
 const STALE_OK_MS = 10 * 60_000;
-export const invalidateAdminCache = () => { cache = null; loading = null; };
+export const invalidateAdminCache = () => { g.cache = null; g.loading = null; };
 const all = async (): Promise<Application[]> => {
   if (isDemo()) return demoApplications();
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.rows;
-  let p = loading;
+  if (g.cache && Date.now() - g.cache.at < TTL_MS) return g.cache.rows;
+  let p = g.loading;
   if (!p) {
-    const q: Promise<Application[]> = getRepository().getApplications().then((rows) => { if (loading === q) cache = { at: Date.now(), rows }; return rows; });
-    const done = () => { if (loading === q) loading = null; };
+    const q: Promise<Application[]> = getRepository().getApplications().then((rows) => { if (g.loading === q) g.cache = { at: Date.now(), rows }; return rows; });
+    const done = () => { if (g.loading === q) g.loading = null; };
     q.then(done, done);
-    loading = p = q;
+    g.loading = p = q;
   }
   try { return await p; }
   catch (e) {
-    if (cache && Date.now() - cache.at < STALE_OK_MS) {
-      console.warn(`[applications] Google Sheets did not answer (${String((e as Error)?.message ?? e).slice(0, 120)}). Using the copy from ${Math.round((Date.now() - cache.at) / 1000)} s ago.`);
-      return cache.rows;
+    if (g.cache && Date.now() - g.cache.at < STALE_OK_MS) {
+      console.warn(`[applications] Google Sheets did not answer (${String((e as Error)?.message ?? e).slice(0, 120)}). Using the copy from ${Math.round((Date.now() - g.cache.at) / 1000)} s ago.`);
+      return g.cache.rows;
     }
     throw e;
   }
