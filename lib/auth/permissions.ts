@@ -9,7 +9,7 @@ import type { Permission, StaffRole } from "@/types/user";
  *  REVIEWER     scores ONLY the applications assigned to them (screening rounds); same limits as a judge
  */
 export const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
-  ADMIN: ["applications:view", "applications:edit", "applications:status", "analytics:view", "config:manage", "judges:manage", "reports:view", "mentors:review", "ai:query", "export:data", "assistant:staff", "users:manage"],
+  ADMIN: ["applications:view", "applications:edit", "applications:status", "analytics:view", "config:manage", "judges:manage", "reports:view", "mentors:review", "ai:query", "export:data", "assistant:staff", "users:manage", "ai:data"],
   COORDINATOR: ["applications:view", "applications:status", "analytics:view", "reports:view", "mentors:review", "export:data", "ai:query", "assistant:staff", "judges:manage"],
   JUDGE: ["applications:view-assigned", "scores:submit", "assistant:staff"],
   REVIEWER: ["applications:view-assigned", "scores:submit", "assistant:staff"],

@@ -23,5 +23,6 @@ export type Permission =
   | "reports:view"
   | "scores:submit"
   | "mentors:review"
+  | "ai:data"                    // AI data desk: reads all application data, writes only NEW "AI ·" tabs (administrators only)
   | "ai:query"
   | "export:data";
