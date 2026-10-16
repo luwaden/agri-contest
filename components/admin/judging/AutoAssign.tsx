@@ -20,7 +20,7 @@ export function AutoAssign({ role, valueChains, states }: { role: "JUDGE" | "REV
       const res = await fetch("/api/admin/assignments", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "auto", role, perApplication: per, statuses, valueChains: chain ? [chain] : [], states: state ? [state] : [], dryRun }) });
       const d = await res.json();
-      if (!res.ok) { setPlan(null); setMsg({ tone: "err", text: d.message ?? "That did not work." }); return; }
+      if (!res.ok) { setPlan(null); setMsg({ tone: "err", text: `${d.message ?? "That did not work."}${d.code ? ` (code ${d.code}${d.ref ? `, ref ${d.ref}: find this ref in the server log` : ""})` : ""}` }); return; }
       setPlan(d);
       if (!dryRun) { setMsg({ tone: "ok", text: `Done: ${d.added} new assignment(s) created. The people can see them now.` }); setPlan(null); router.refresh(); }
     } catch { setMsg({ tone: "err", text: "Could not reach the server." }); } finally { setBusy(false); }

@@ -53,7 +53,7 @@ export async function autoAssign(input: unknown, actor: string): Promise<Service
 
   const at = now();
   const rows: PanelReview[] = plan.create.map((c) => ({ reviewId: newReviewId(), applicationId: c.applicationId, panelEmail: c.panelEmail, panelName: c.panelName, panelRole: o.role,
-    status: "ASSIGNED", assignedAt: at, assignedBy: actor, scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: at, submittedAt: null }));
+    status: "ASSIGNED", assignedAt: at, assignedBy: actor, scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: at, submittedAt: null, decision: null }));
   let added: number;
   try { added = await getRepository().createReviews(rows); } catch (e) { if (tabMissing(e)) return fail(409, TAB_MSG); throw e; }
   await getRepository().logEvent({ at, applicationId: "-", actor, action: "PANEL_AUTO_ASSIGNED", detail: `${added} ${o.role.toLowerCase()} assignment(s), ${o.perApplication} per application, ${pool.length} application(s)` });
@@ -79,7 +79,7 @@ export async function assignOne(input: unknown, actor: string): Promise<ServiceR
   try {
     if (existing) review = await repo.updateReview(existing.reviewId, { status: "ASSIGNED", assignedAt: at, assignedBy: actor, panelRole: person.role, panelName: person.name });
     else {
-      review = { reviewId: newReviewId(), applicationId, panelEmail, panelName: person.name, panelRole: person.role, status: "ASSIGNED", assignedAt: at, assignedBy: actor, scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: at, submittedAt: null };
+      review = { reviewId: newReviewId(), applicationId, panelEmail, panelName: person.name, panelRole: person.role, status: "ASSIGNED", assignedAt: at, assignedBy: actor, scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: at, submittedAt: null, decision: null };
       await repo.createReviews([review]);
     }
   } catch (e) { if (tabMissing(e)) return fail(409, TAB_MSG); throw e; }
@@ -149,7 +149,7 @@ export async function myWork(user: SessionUser) {
 const listItem = (a: Application) => ({ applicationId: a.applicationId, businessName: a.business.businessName, valueChain: a.business.valueChain, state: a.location.state, stage: a.business.stage, setting: a.business.setting, generatesRevenue: a.business.generatesRevenue });
 export type WorkItem = Awaited<ReturnType<typeof myWork>>[number];
 /** Never send who else is on the panel or what they scored. The person's own row is all they get. */
-const stripForOwner = (r: PanelReview) => ({ reviewId: r.reviewId, status: r.status, assignedAt: r.assignedAt, scores: r.scores, comments: r.comments, overallComment: r.overallComment, total: r.total, conflictNote: r.conflictNote, updatedAt: r.updatedAt, submittedAt: r.submittedAt });
+const stripForOwner = (r: PanelReview) => ({ reviewId: r.reviewId, status: r.status, assignedAt: r.assignedAt, scores: r.scores, comments: r.comments, overallComment: r.overallComment, total: r.total, conflictNote: r.conflictNote, updatedAt: r.updatedAt, submittedAt: r.submittedAt, decision: r.decision });
 export type OwnReview = ReturnType<typeof stripForOwner>;
 
 async function ownRow(user: SessionUser, applicationId: string) {
@@ -187,7 +187,7 @@ export async function declareConflict(user: SessionUser, applicationId: string, 
   const note = typeof input.note === "string" ? input.note.trim().slice(0, 500) : "";
   if (note.length < 5) return fail(422, "Please say briefly what the relationship is (for example: \"former colleague\"). Only the programme team sees this.", { errors: { note: "Please describe the relationship briefly." } });
   const at = now();
-  const next = await getRepository().updateReview(row.reviewId, { status: "CONFLICT", conflictNote: note, scores: {}, comments: {}, overallComment: "", total: null, submittedAt: null, updatedAt: at });
+  const next = await getRepository().updateReview(row.reviewId, { status: "CONFLICT", conflictNote: note, scores: {}, comments: {}, overallComment: "", total: null, submittedAt: null, updatedAt: at, decision: null });
   await getRepository().logEvent({ at, applicationId, actor: user.email, action: "CONFLICT_DECLARED", detail: `${user.role}: ${note.slice(0, 120)}` });
   return { ok: true, status: 200, data: { review: stripForOwner(next!) } };
 }

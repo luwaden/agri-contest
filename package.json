@@ -13,6 +13,7 @@
     "print:headers": "tsx scripts/print-headers.ts",
     "build:appsscript": "tsx scripts/print-appsscript.ts",
     "check:google": "tsx scripts/check-google.ts",
+    "check:speed": "tsx scripts/check-speed.ts",
     "make-user": "tsx --conditions=react-server scripts/make-user.ts",
     "check:system": "tsx --conditions=react-server scripts/check-system.ts",
     "check:live": "tsx --conditions=react-server scripts/check-live.ts",

@@ -3,6 +3,7 @@ import { requireApiPermission } from "@/lib/auth/server";
 import { readJson, sameOrigin, serverError } from "@/lib/http";
 import { REFERENCE_PATTERN } from "@/lib/reference";
 import { declareConflict, saveScoreSheet } from "@/lib/services/reviewService";
+import { setDecision } from "@/lib/services/screeningService";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
@@ -27,4 +28,14 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 export async function POST(req: NextRequest, ctx: Ctx) {
   const g = await guard(req, ctx); if ("error" in g) return g.error;
   try { return send(await declareConflict(g.user, g.id, ((await readJson(req, 2_000)) ?? {}) as Record<string, unknown>)); } catch (e) { return serverError(e); }
+}
+
+/** Reviewers: { pass: true } passes the application to the next stage, { pass: false } takes the pass back. Limited per reviewer. */
+export async function PATCH(req: NextRequest, ctx: Ctx) {
+  const g = await guard(req, ctx); if ("error" in g) return g.error;
+  try {
+    const body = ((await readJson(req, 500)) ?? {}) as Record<string, unknown>;
+    if (typeof body.pass !== "boolean") return NextResponse.json({ message: "Say whether to pass the application." }, { status: 422 });
+    return send(await setDecision(g.user, g.id, body.pass));
+  } catch (e) { return serverError(e); }
 }

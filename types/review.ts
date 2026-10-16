@@ -30,6 +30,8 @@ export interface PanelReview {
   conflictNote: string;
   updatedAt: string;
   submittedAt: string | null;
+  /** Screening round: the reviewer passes this application to the next stage. Each reviewer has a limited number of passes. */
+  decision: "PASS" | null;
 }
 
 /** Counts towards "this application has enough panel members". Conflicts and withdrawn rows do not. */

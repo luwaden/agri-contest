@@ -173,7 +173,8 @@ var TABS = {
     "criterion_comments_json",
     "conflict_note",
     "updated_at",
-    "submitted_at"
+    "submitted_at",
+    "decision"
   ]
 };
 

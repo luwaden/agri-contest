@@ -10,7 +10,7 @@ import type { PanelReview } from "../types/review";
 const people = (n: number, role: "REVIEWER" | "JUDGE" = "REVIEWER") => Array.from({ length: n }, (_, i) => ({ email: `${role.toLowerCase()}${i + 1}@example.org`, name: `${role} ${i + 1}`, role }));
 const apps = (n: number) => Array.from({ length: n }, (_, i) => ({ applicationId: `AGRA-2026-AAAA${String(i).padStart(2, "2")}`.slice(0, 16), applicantEmail: `applicant${i}@example.org` }));
 const toRows = (plan: ReturnType<typeof planAssignments>, role: "REVIEWER" | "JUDGE" = "REVIEWER", status: PanelReview["status"] = "ASSIGNED"): PanelReview[] =>
-  plan.create.map((c, i) => ({ reviewId: `RV-${i}`, applicationId: c.applicationId, panelEmail: c.panelEmail, panelName: c.panelName, panelRole: role, status, assignedAt: "2026-10-10T10:00:00Z", assignedBy: "a", scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: "2026-10-10T10:00:00Z", submittedAt: null }));
+  plan.create.map((c, i) => ({ reviewId: `RV-${i}`, applicationId: c.applicationId, panelEmail: c.panelEmail, panelName: c.panelName, panelRole: role, status, assignedAt: "2026-10-10T10:00:00Z", assignedBy: "a", scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: "2026-10-10T10:00:00Z", submittedAt: null, decision: null }));
 
 // ───────── assignment ─────────
 test("assignment: shares work evenly, never the same person twice on one application", () => {
@@ -62,7 +62,7 @@ test("score sheet: rejects 0, 11, decimals and text; the total is weighted out o
 test("results: averages only submitted sheets, flags far-apart scores and ties, ranks with the framework tie-breaks", () => {
   const list = demoApplications(4);
   const R = (app: number, who: string, total: number | null, scores: Record<string, number> = {}, status: PanelReview["status"] = "SUBMITTED"): PanelReview =>
-    ({ reviewId: `${app}${who}`, applicationId: list[app].applicationId, panelEmail: who, panelName: who, panelRole: "REVIEWER", status, assignedAt: "", assignedBy: "", scores, comments: {}, overallComment: "", total, conflictNote: "", updatedAt: "", submittedAt: "" });
+    ({ reviewId: `${app}${who}`, applicationId: list[app].applicationId, panelEmail: who, panelName: who, panelRole: "REVIEWER", status, assignedAt: "", assignedBy: "", scores, comments: {}, overallComment: "", total, conflictNote: "", updatedAt: "", submittedAt: "", decision: null });
   const s = (o: number, sc: number, f: number) => ({ originality: o, scalability: sc, feasibility: f, impact: 5, market: 5 });
   const reviews = [
     R(0, "a", 80, s(9, 8, 7)), R(0, "b", 50, s(5, 5, 5)),           // avg 65, spread 30
@@ -92,7 +92,7 @@ test("judges and reviewers get no admin answers from the assistant", () => {
 
 // ───────── sheet row ─────────
 test("Panel Reviews row: round trip, formula guard, and broken rows are ignored", () => {
-  const r: PanelReview = { reviewId: "RV-ABC", applicationId: "AGRA-2026-AAAAA2", panelEmail: "x@example.org", panelName: "=Evil", panelRole: "JUDGE", status: "SUBMITTED", assignedAt: "2026-10-10T10:00:00Z", assignedBy: "a@example.org", scores: full, comments: { impact: "+good" }, overallComment: "@note", total: 71, conflictNote: "", updatedAt: "2026-10-11T10:00:00Z", submittedAt: "2026-10-11T10:00:00Z" };
+  const r: PanelReview = { reviewId: "RV-ABC", applicationId: "AGRA-2026-AAAAA2", panelEmail: "x@example.org", panelName: "=Evil", panelRole: "JUDGE", status: "SUBMITTED", assignedAt: "2026-10-10T10:00:00Z", assignedBy: "a@example.org", scores: full, comments: { impact: "+good" }, overallComment: "@note", total: 71, conflictNote: "", updatedAt: "2026-10-11T10:00:00Z", submittedAt: "2026-10-11T10:00:00Z", decision: "PASS" };
   const row = reviewToRow(r); assert.equal(row.length, REVIEW_HEADERS.length); assert.equal(row[3], "'=Evil");
   assert.deepEqual(rowToReview(row), r);
   assert.equal(rowToReview(["RV-1", "AGRA-2026-AAAAA2", "x@example.org", "X", "MODERATOR", "SUBMITTED"]), null);

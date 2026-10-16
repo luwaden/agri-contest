@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { WorkItem } from "@/lib/services/reviewService";
 import { formatDate, settingLabel, stageLabel, valueChainLabel } from "@/lib/labels";
+import { PassButton } from "./PassButton";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   ASSIGNED: { label: "To score", cls: "bg-sun text-night" },
@@ -15,7 +16,7 @@ const SORTS = { assigned: "Oldest assigned first", ref: "Reference", name: "Busi
 type Sort = keyof typeof SORTS;
 
 /** The panel member's own applications with filters. Filters live in the address bar, so they survive opening a score sheet and coming back. */
-export function WorkList({ items, base }: { items: WorkItem[]; base: string }) {
+export function WorkList({ items, base, pass }: { items: WorkItem[]; base: string; pass?: { count: number; limit: number } }) {
   const params = useSearchParams(); const router = useRouter(); const path = usePathname();
   const f = { q: params.get("q") ?? "", status: params.get("status") ?? "", chain: params.get("chain") ?? "", state: params.get("state") ?? "", stage: params.get("stage") ?? "", setting: params.get("setting") ?? "", sort: (params.get("sort") as Sort) || "assigned" };
   const set = (k: string, v: string) => { const p = new URLSearchParams(params.toString()); if (v) p.set(k, v); else p.delete(k); router.replace(`${path}${p.size ? `?${p}` : ""}`, { scroll: false }); };
@@ -28,7 +29,7 @@ export function WorkList({ items, base }: { items: WorkItem[]; base: string }) {
 
   const shown = useMemo(() => {
     const q = f.q.trim().toLowerCase();
-    const list = items.filter((w) => (!f.status || w.review.status === f.status) && (!f.chain || w.app.valueChain === f.chain) && (!f.state || w.app.state === f.state)
+    const list = items.filter((w) => (!f.status || (f.status === "PASSED" ? w.review.decision === "PASS" : w.review.status === f.status)) && (!f.chain || w.app.valueChain === f.chain) && (!f.state || w.app.state === f.state)
       && (!f.stage || w.app.stage === f.stage) && (!f.setting || w.app.setting === f.setting)
       && (!q || w.app.applicationId.toLowerCase().includes(q) || w.app.businessName.toLowerCase().includes(q)));
     const score = (w: WorkItem) => w.review.total ?? -1;
@@ -43,7 +44,7 @@ export function WorkList({ items, base }: { items: WorkItem[]; base: string }) {
     <div className="space-y-4">
       {/* Status tabs */}
       <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-2">
-        {[["", `All (${items.length})`], ["ASSIGNED", `To score (${statusCount("ASSIGNED")})`], ["IN_PROGRESS", `In progress (${statusCount("IN_PROGRESS")})`], ["SUBMITTED", `Submitted (${statusCount("SUBMITTED")})`], ["CONFLICT", `Conflicts (${statusCount("CONFLICT")})`]].map(([v, l]) => (
+        {[["", `All (${items.length})`], ["ASSIGNED", `To score (${statusCount("ASSIGNED")})`], ["IN_PROGRESS", `In progress (${statusCount("IN_PROGRESS")})`], ["SUBMITTED", `Submitted (${statusCount("SUBMITTED")})`], ["CONFLICT", `Conflicts (${statusCount("CONFLICT")})`], ...(pass ? [["PASSED", `Passed (${items.filter((w) => w.review.decision === "PASS").length})`]] : [])].map(([v, l]) => (
           <button key={v} type="button" aria-pressed={f.status === v} onClick={() => set("status", v)}
             className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors ${f.status === v ? "border-primary bg-primary text-white" : "border-paper-line bg-white text-primary hover:border-primary"}`}>{l}</button>
         ))}
@@ -77,8 +78,8 @@ export function WorkList({ items, base }: { items: WorkItem[]; base: string }) {
             const s = STATUS[w.review.status] ?? STATUS.ASSIGNED;
             const action = w.review.status === "ASSIGNED" ? "Start scoring" : w.review.status === "IN_PROGRESS" ? "Continue" : "View";
             return (
-              <li key={w.review.reviewId}>
-                <Link href={`${base}/${w.app.applicationId}`} className="group grid items-center gap-3 rounded-tile border border-paper-line bg-white px-5 py-4 transition-shadow hover:shadow-card sm:grid-cols-[1fr_auto_auto]">
+              <li key={w.review.reviewId} className={pass ? `overflow-hidden rounded-tile border bg-white transition-shadow hover:shadow-card ${w.review.decision === "PASS" ? "border-primary" : "border-paper-line"}` : undefined}>
+                <Link href={`${base}/${w.app.applicationId}`} className={`group grid items-center gap-3 px-5 py-4 sm:grid-cols-[1fr_auto_auto] ${pass ? "" : "rounded-tile border border-paper-line bg-white transition-shadow hover:shadow-card"}`}>
                   <div className="min-w-0">
                     <p className="font-mono text-xs text-ink-muted">{w.app.applicationId}</p>
                     <p className="truncate font-display text-lg font-extrabold text-primary group-hover:underline">{w.app.businessName || "(no business name)"}</p>
@@ -91,6 +92,7 @@ export function WorkList({ items, base }: { items: WorkItem[]; base: string }) {
                   </div>
                   <span className="justify-self-start rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white sm:justify-self-end">{action} →</span>
                 </Link>
+                {pass && w.review.status !== "CONFLICT" && <div className="flex items-center justify-between gap-3 border-t border-paper-line bg-paper-warm/40 px-5 py-2.5"><span className="text-xs text-ink-muted">{w.review.decision === "PASS" ? "You passed this to the next stage." : "Next stage"}</span><PassButton applicationId={w.app.applicationId} passed={w.review.decision === "PASS"} count={pass.count} limit={pass.limit} size="sm" /></div>}
               </li>
             );
           })}

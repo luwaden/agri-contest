@@ -11,4 +11,6 @@ export interface SheetTransport {
   clearRow(sheet: string, rowNumber: number, width: number): Promise<void>;
   /** Optional: many rows in ONE request (Google allows about 60 writes a minute). Falls back to append() one by one. */
   appendMany?(sheet: string, rows: string[][]): Promise<void>;
+  /** Optional: rewrite many rows in ONE request. Falls back to updateRow() one by one. */
+  updateRows?(sheet: string, rows: Array<{ rowNumber: number; row: string[] }>): Promise<void>;
 }

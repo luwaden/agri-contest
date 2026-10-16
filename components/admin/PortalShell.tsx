@@ -13,7 +13,7 @@ export async function PortalShell({ children }: { children: React.ReactNode }) {
   if (isPanelRole(user.role)) redirect(homeFor(user.role));
   const links: Array<[string, string, boolean]> = [
     ["Dashboard", "/admin", true], ["Applications", "/admin/applications", true],
-    ["Judging", "/admin/judging", can(user.role, "judges:manage")], ["Panel applications", "/admin/mentors", can(user.role, "mentors:review")], ["AI assistant", "/admin/ai", can(user.role, "ai:query")], ["System check", "/admin/system", can(user.role, "reports:view")], ["Staff", "/admin/staff", can(user.role, "users:manage")],
+    ["Screening", "/admin/screening", can(user.role, "judges:manage")], ["Judging", "/admin/judging", can(user.role, "judges:manage")], ["Panel applications", "/admin/mentors", can(user.role, "mentors:review")], ["AI assistant", "/admin/ai", can(user.role, "ai:query")], ["System check", "/admin/system", can(user.role, "reports:view")], ["Staff", "/admin/staff", can(user.role, "users:manage")],
   ];
   return (
     <div className="min-h-screen bg-paper-warm">

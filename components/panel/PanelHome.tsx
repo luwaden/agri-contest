@@ -4,6 +4,7 @@ import { WorkList } from "./WorkList";
 import { DEFAULT_CRITERIA, SCORE_BANDS } from "@/config/scoring";
 import { roleLabel } from "@/lib/auth/permissions";
 import { myWork } from "@/lib/services/reviewService";
+import { passState } from "@/lib/services/screeningService";
 import type { SessionUser } from "@/types/user";
 
 /** Home of the judge and reviewer portals: progress, the filterable list of applications assigned to them, and the rubric. */
@@ -14,6 +15,7 @@ export async function PanelHome({ user }: { user: SessionUser }) {
   const done = count("SUBMITTED");
   const pct = live ? Math.round((done / live) * 100) : 0;
   const base = user.role === "JUDGE" ? "/judge" : "/review";
+  const ps = await passState(user);
   return (
     <PanelShell user={user}>
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -21,10 +23,15 @@ export async function PanelHome({ user }: { user: SessionUser }) {
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">{roleLabel(user.role)} portal</p>
           <h1 className="mt-1 font-display text-3xl font-extrabold text-primary">Welcome, {user.name.split(" ")[0]}</h1>
           <p className="mt-1 max-w-2xl text-ink-soft">
-            {user.role === "REVIEWER" ? "Score each entry in the screening round against the rubric." : "Score each entry against the rubric."} You only ever see applications assigned to you, and nobody else sees your scores except the programme team.
+            {ps ? `Read each application and pass the strongest ${ps.limit} to the next stage. Scoring with the rubric is optional but helps you compare.` : "Score each entry against the rubric."} You only ever see applications assigned to you, and nobody else sees your scores except the programme team.
           </p>
         </div>
-        {live > 0 && (
+        {ps && live > 0 ? (
+          <div className="w-full max-w-xs" aria-label={`${ps.passed} of ${ps.limit} passed`}>
+            <div className="flex justify-between text-sm font-semibold text-primary"><span>Passed to next stage</span><span className="tabular-nums">{ps.passed} of {ps.limit}</span></div>
+            <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-paper-line"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, Math.round((ps.passed / ps.limit) * 100))}%` }} /></div>
+          </div>
+        ) : live > 0 && (
           <div className="w-full max-w-xs" aria-label={`${done} of ${live} submitted`}>
             <div className="flex justify-between text-sm font-semibold text-primary"><span>Progress</span><span className="tabular-nums">{done} of {live} submitted</span></div>
             <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-paper-line"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} /></div>
@@ -45,7 +52,7 @@ export async function PanelHome({ user }: { user: SessionUser }) {
             <p className="font-display text-xl font-extrabold text-primary">No applications assigned to you yet</p>
             <p className="mx-auto mt-2 max-w-lg text-ink-soft">The programme team assigns applications when the {user.role === "REVIEWER" ? "screening round" : "judging round"} opens. They will appear here, and you will be told. Meanwhile, read the scoring guide below.</p>
           </div>
-        ) : <Suspense><WorkList items={items} base={base} /></Suspense>}
+        ) : <Suspense><WorkList items={items} base={base} pass={ps ? { count: ps.passed, limit: ps.limit } : undefined} /></Suspense>}
       </section>
 
       <section id="rubric" className="mt-12 scroll-mt-24" aria-labelledby="rubric-h">

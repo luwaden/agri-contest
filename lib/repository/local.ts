@@ -89,4 +89,12 @@ export class LocalRepository implements ApplicationRepository {
     Object.assign(r, patch, { reviewId: r.reviewId, applicationId: r.applicationId, panelEmail: r.panelEmail, updatedAt: patch.updatedAt ?? new Date().toISOString() });
     await save(s); return { ...r };
   });
+  updateReviews = (changes: Array<{ reviewId: string; patch: Partial<PanelReview> }>) => serial(async () => {
+    const s = await load(); const out: PanelReview[] = []; const at = new Date().toISOString();
+    for (const { reviewId, patch } of changes) {
+      const r = (s.reviews ?? []).find((x) => x.reviewId === reviewId); if (!r) continue;
+      Object.assign(r, patch, { reviewId: r.reviewId, applicationId: r.applicationId, panelEmail: r.panelEmail, updatedAt: patch.updatedAt ?? at }); out.push({ ...r });
+    }
+    await save(s); return out;
+  });
 }

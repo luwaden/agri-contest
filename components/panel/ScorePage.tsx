@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { PanelShell } from "./PanelShell";
 import { ScoreSheet } from "./ScoreSheet";
 import { openForScoring } from "@/lib/services/reviewService";
+import { passState } from "@/lib/services/screeningService";
+import { PassButton } from "./PassButton";
 import { ACTIVE_CRITERIA } from "@/lib/judging";
 import { REFERENCE_PATTERN } from "@/lib/reference";
 import * as L from "@/lib/labels";
@@ -27,6 +29,7 @@ export async function ScorePage({ user, id, base }: { user: SessionUser; id: str
   if (!data) notFound();
   const { application: a, review, position } = data; const b = a.business, i = a.impact;
   const prev = position.index > 0 ? position.ids[position.index - 1] : null, next = position.index >= 0 && position.index < position.ids.length - 1 ? position.ids[position.index + 1] : null;
+  const ps = await passState(user);
   const fileHref = (url: string) => (url.startsWith("https://res.cloudinary.com/") ? `/api/admin/files?url=${encodeURIComponent(url)}` : url);
   return (
     <PanelShell user={user}>
@@ -64,7 +67,14 @@ export async function ScorePage({ user, id, base }: { user: SessionUser; id: str
           <Block title="Documents" rows={a.documents.length ? a.documents.map((d): [string, React.ReactNode] => [L.documentLabel(d.kind), <a key={d.url} href={fileHref(d.url)} target="_blank" rel="noopener noreferrer" className="break-all font-semibold text-azure underline">Open</a>]) : [["Documents", "None provided"]]} />
           <p className="text-xs text-ink-muted">Contact details, address and date of birth are hidden from panel members on purpose.</p>
         </div>
-        <div className="lg:sticky lg:top-6">
+        <div className="space-y-4 lg:sticky lg:top-6">
+          {ps && review.status !== "CONFLICT" && (
+            <div className="rounded-card border border-paper-line bg-white p-4">
+              <p className="text-sm font-semibold text-primary">Next stage</p>
+              <p className="mb-3 mt-0.5 text-sm text-ink-soft">You have passed {ps.passed} of {ps.limit}. You can change your mind until the round closes.</p>
+              <PassButton applicationId={a.applicationId} passed={review.decision === "PASS"} count={ps.passed} limit={ps.limit} />
+            </div>
+          )}
           <ScoreSheet applicationId={a.applicationId} applicantName={a.applicantName} initial={review} criteria={ACTIVE_CRITERIA} backHref={base} nextHref={next ? `${base}/${next}` : null} />
         </div>
       </div>

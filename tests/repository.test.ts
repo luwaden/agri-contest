@@ -49,6 +49,7 @@ class FakeRest implements SheetTransport {          // behaves like the Sheets R
   async append(s: string, row: string[]) { this.tabs.get(s)!.push([...row]); }
   async updateRow(s: string, n: number, row: string[]) { this.tabs.get(s)![n - 1] = [...row]; }
   async clearRow(s: string, n: number, w: number) { this.tabs.get(s)![n - 1] = new Array(w).fill(""); }
+  async updateRows(s: string, rows: Array<{ rowNumber: number; row: string[] }>) { for (const r of rows) this.tabs.get(s)![r.rowNumber - 1] = [...r.row]; }
 }
 
 async function contract(name: string, repo: ApplicationRepository) {
@@ -79,7 +80,7 @@ async function contract(name: string, repo: ApplicationRepository) {
   // panel reviews (assignments + score sheets)
   assert.deepEqual(await repo.getReviews(), [], `${name}: no reviews yet`);
   const rv = (id: string, app: string, email: string) => ({ reviewId: id, applicationId: app, panelEmail: email, panelName: "=Rev " + id, panelRole: "REVIEWER" as const, status: "ASSIGNED" as const,
-    assignedAt: "2026-10-10T10:00:00Z", assignedBy: "admin@example.org", scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: "2026-10-10T10:00:00Z", submittedAt: null });
+    assignedAt: "2026-10-10T10:00:00Z", assignedBy: "admin@example.org", scores: {}, comments: {}, overallComment: "", total: null, conflictNote: "", updatedAt: "2026-10-10T10:00:00Z", submittedAt: null, decision: null });
   assert.equal(await repo.createReviews([rv("RV-1", "AGRA-2026-AAAAA2", "r1@example.org"), rv("RV-2", "AGRA-2026-AAAAA2", "r2@example.org"), rv("RV-3", "AGRA-2026-AAAAA3", "r1@example.org")]), 3, `${name}: reviews created`);
   assert.equal(await repo.createReviews([rv("RV-9", "AGRA-2026-AAAAA2", "r1@example.org"), rv("RV-4", "AGRA-2026-AAAAA4", "r2@example.org")]), 1, `${name}: same person + application is never added twice`);
   const sub = await repo.updateReview("RV-2", { status: "SUBMITTED", scores: { originality: 8, feasibility: 7, scalability: 6, impact: 9, market: 5 }, comments: { market: "=thin, evidence" }, overallComment: "Strong idea; needs buyers.\nSecond line", total: 71, submittedAt: "2026-10-11T09:00:00Z" });
@@ -90,6 +91,12 @@ async function contract(name: string, repo: ApplicationRepository) {
   assert.equal((await repo.getReviews()).find((r) => r.reviewId === "RV-1")!.status, "ASSIGNED", `${name}: other review rows untouched`);
   assert.equal(await repo.updateReview("RV-NOPE", { status: "WITHDRAWN" }), null);
   assert.equal((await repo.getReviews()).length, 4, `${name}: review count`);
+  // batch updates (moves, passes)
+  const many = await repo.updateReviews([{ reviewId: "RV-1", patch: { status: "WITHDRAWN" } }, { reviewId: "RV-3", patch: { decision: "PASS" } }, { reviewId: "RV-NOPE", patch: { status: "WITHDRAWN" } }]);
+  assert.equal(many.length, 2, `${name}: unknown ids skipped`);
+  const after = await repo.getReviews();
+  assert.deepEqual([after.find((r) => r.reviewId === "RV-1")!.status, after.find((r) => r.reviewId === "RV-3")!.decision, after.find((r) => r.reviewId === "RV-2")!.total, after.find((r) => r.reviewId === "RV-4")!.decision],
+    ["WITHDRAWN", "PASS", 71, null], `${name}: batch update round trip, others untouched`);
 }
 
 test("repository contract: local JSON store", async () => { const { LocalRepository } = await import("../lib/repository/local"); await contract("local", new LocalRepository()); });

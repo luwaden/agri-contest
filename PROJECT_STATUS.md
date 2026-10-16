@@ -1,4 +1,4 @@
-# PROJECT_STATUS.md: handover (written 11 Oct 2026, 03:30 WAT)
+# PROJECT_STATUS.md: handover (updated 16 Oct 2026, 11:40 WAT; replaces the 13 Oct version)
 
 > **For the next Claude conversation:** the user's GitHub repository, on their Windows PC (`C:\Users\ayode\Downloads\agra-contest-current\agri-contest-12-01`), is the source of truth. The copy this document was written from is a cloud workspace that differs in at least one known place (see §6). **Read the relevant files before changing anything.** Since 9 Oct the user asks for **only the changed files** (as a small zip plus exact `git add` paths), never the whole project, and **never** a replacement for `config/programme.ts`: give line edits for that file instead.
 >
@@ -12,8 +12,8 @@
 
 ## 1. Purpose, stack, architecture
 **Purpose.** The public website and staff tools for the **AGRA–SMEDAN Youth Agri-Innovation Contest**, delivered by Plus Incubation Hub Nigeria Limited. Young Nigerians (aged 18–35) apply online. Mentors, judges and reviewers apply to join the panel. Staff review everything in an admin area.
-- **Live URL:** https://agri-contest.vercel.app
-- **Applications are open and live data exists.** On 9 Oct the preflight read **402 applications and 2 panel applications** [VERIFIED from the user's pasted output].
+- **Live URL:** https://agri-contest.vercel.app (Vercel). **On 13 Oct the user said they have moved to another hosting platform**; the new host and its URL are not known to me. Vercel still runs `2026.10.11` [VERIFIED from the user's preflight output].
+- **Applications are open and live data exists.** On 13 Oct the preflight read **6,238 applications, 15 panel applications, 196 drafts and 6 staff accounts in Admin Users**, all ✔ [VERIFIED from the user's pasted output].
 - **Dates** come from `config/programme.ts` and the env settings:
   - application window: 8–16 Oct 2026 (WAT)
   - grand finale: Thu 29 Oct 2026
@@ -75,7 +75,8 @@ docs/                   SAFE_UPDATE, EMAIL, CHECK_EVERYTHING, DEPLOY_TO_VERCEL, 
 | Application Events | 5 | `at, application_id, actor, action, detail`. Audit log: SUBMITTED, status changes, SYSTEM_CHECK, PASSWORD_*, STAFF_*, **EMAIL_FAILED**. |
 | Mentors | 27 | Panel applications. ID like `MNTR-2026-…`. Columns 26–27 (`first_name`, `last_name`) were added on 9 Oct. `full_name` is still written. |
 | Admin Users | 8 | `user_id, name, email, role, active, note, password_hash, updated_at`. bcrypt hashes only. |
-| Judges | 6 | Created but not used yet. |
+| Judges | 6 | Legacy and unused; assignments live in Panel Reviews. |
+| **Panel Reviews** | 20 | **New 11 Oct.** One row per (application, judge or reviewer): `review_id, application_id, panel_email, panel_name, panel_role, status, assigned_at, assigned_by, score_originality…score_market (5), weighted_total, overall_comment, criterion_comments_json, conflict_note, updated_at, submitted_at`. Status is one of ASSIGNED, IN_PROGRESS, SUBMITTED, CONFLICT or WITHDRAWN. **Column 20 `decision` (PASS or blank) added 16 Oct** for reviewer passes; it reaches the live sheet only when the user runs `npm run setup:sheets` [NOT YET RUN]. Defined in `lib/google-sheets/reviewSchema.ts`. **Created on the live sheet by setup:sheets on 13 Oct** [VERIFIED]. |
 | Configuration | 4 | Created but not used yet. |
 
 **Summary tabs:** State, Applicant, Business and Inclusion Metrics. These are formula tabs that `setup:sheets` rewrites.
@@ -90,7 +91,7 @@ docs/                   SAFE_UPDATE, EMAIL, CHECK_EVERYTHING, DEPLOY_TO_VERCEL, 
   - checks the headers of every tab
   - round-trips every existing row through the current code
 
-**Latest migration:** Mentors gained `first_name` and `last_name` [VERIFIED: the user ran preflight (✔ SAFE) and then setup:sheets].
+**Pending migration (16 Oct):** append `decision` to Panel Reviews (preflight, then setup:sheets). **Previous migration (13 Oct):** created the **Panel Reviews** tab [VERIFIED: the user ran preflight (✔ SAFE TO DEPLOY, 6,238 rows round-tripped) and then setup:sheets]. Before that, on 9 Oct, Mentors gained `first_name` and `last_name`.
 
 ## 4. Authentication, authorization, security
 **Who signs in:**
@@ -100,7 +101,7 @@ docs/                   SAFE_UPDATE, EMAIL, CHECK_EVERYTHING, DEPLOY_TO_VERCEL, 
 | Role | Can do | Signs in to |
 |---|---|---|
 | ADMIN | everything | `/admin` |
-| COORDINATOR | everything except settings and user management | `/admin` |
+| COORDINATOR | everything except settings and user management; **can assign judges and reviewers** (`judges:manage`) | `/admin` |
 | JUDGE | only assigned applications and scoring; no lists, totals or exports | `/judge` |
 | REVIEWER | same limits as JUDGE | `/review` |
 
@@ -150,12 +151,30 @@ Details are in `docs/ACCESS_AND_LOGIN.md` and `docs/SECURITY_AUDIT.md`.
 | "Check your Spam folder" note on the success page, and an email with no web links | Built and tested (11 Oct, `spam-update.zip`). **Not confirmed as applied or deployed.** |
 | Contact email `youthagriinnovate@gmail.com`; footer "Implemented by" box links www.plusincubationhub.com | [VERIFIED] in my copy (browser). User's copy: they hit the missing `config/implementer.ts` error, then were told how to fix it [ASSUMED fixed]. |
 | PIH logo in the footer | User added `public/…/PIH.png` and the `IMPLEMENTER` logo line in **their** `config/programme.ts` [USER-REPORTED]. **My copy has no logo line.** |
-| AI assistant (staff-only) | Built earlier. `AI_PROVIDER` on the live site is unknown [ASSUMED off or quick answers only]. |
-| Judge and reviewer **assignments and scoring** | **[NOT BUILT].** The portals deliberately show no applications. |
-| Tier-1 automatic screening, applicant status emails, self-service password reset by email | **[NOT BUILT]** |
+| AI assistant (staff-only) | Built earlier. **11 Oct:** new panel answers (how to score, changing a submitted score, others' scores, "the AI can't score for you") and admin answers (how to assign, where the results are). Ranking now gives a +2 bonus to entries for the asker's own audience. Judges and reviewers never get admin answers or applicant figures [VERIFIED by test]. `AI_PROVIDER` on the live site is unknown [ASSUMED off or quick answers only]. |
+| **Judging: assignments** (Admin → **Judging**, `/admin/judging`) | **Built 11 Oct.** Round toggle (`?round=reviewers` or `?round=judges`). Auto-assign takes a number per application, a status filter, and an optional single value chain or state; you **Preview** before you **Confirm**. It balances by current workload with a seeded tie-break. It never gives the same person an application twice, never gives anyone their own application (matched by email), and never gives an application to someone who declared a conflict on it. Re-running only fills gaps. Manual assign, **Withdraw** and **Reopen** are on the application detail page under "Panel reviews". Conflicts list shows a "Give to someone else" button. The page also shows progress by person and a Results table (rank, average of SUBMITTED sheets only, per-criterion averages, min–max, flags TIE / SPREAD ≥20 / WAITING / NEEDS_PANEL, CSV download). [VERIFIED] by tests and a local Playwright run with 64 demo applications and with 6,238 seeded applications. **Not yet verified on the live site.** |
+| **Judging: reviewer and judge portals** (`/review`, `/judge`, `/review/[id]`, `/judge/[id]`) | **Built 11 Oct.** The home page shows progress, status tabs (To score, In progress, Submitted, Conflicts) and filters (search, value chain, state, stage, rural/urban, sort); filters are kept in the URL. The score sheet puts the application on the left and the sheet on the right: 1–10 per criterion with band text, optional notes, a required overall comment (20+ characters), a no-conflict tick, a live weighted total, Save draft, and Submit, which locks the sheet. It also has "Declare a conflict", Prev/Next, and document links (`/api/admin/files` now lets panel members open files of applications assigned to them). Panel members never receive phone, WhatsApp, email, address, date of birth or disability details, or anyone else's scores (`panelView`, `stripForOwner`). Unassigned applications return 404. [VERIFIED] locally. |
+| **Screening pipeline** (Admin → **Screening**, `/admin/screening`; built 16 Oct, v2026.10.16) | Step 1: eligibility rules + automatic **pre-score** (same 5 criteria/weights, estimated in code from the answers; no LLM, no cost) → top 1,300 CSV (`lib/screening`, `config/screening.ts`). Step 2: batch of 500 from the top 1,300 with a fair spread (every state ≥1; zone and value chain ≥ half their shortlist share; women ≥30% and rural ≥20% from internal TARGETS when available) shared evenly between chosen reviewers, preview then confirm. Step 3: board per reviewer; tick → Move to a person or "share evenly"; passed/scored work never moves; old row kept WITHDRAWN. Reviewers press **Pass** (limit 15, server-enforced; `SCREENING_PASS_PER_REVIEWER`). Reviewers do **not** see the pre-score (independent judgment). Step 4: send passed to judges (existing score sheets), top 30 CSV. CSVs: top list, all with reasons, batch, passed, top 30 (`export:data`, logged as SCREENING_EXPORT). [VERIFIED] by 7 new tests and a local Playwright walk on 6,238 seeded applications (dev, local store). **Not run against the live sheet.** |
+| **Screening "Quick requests"** (top of Admin → Screening; 16 Oct) | Plain-language box. Lists: e.g. "best 1300, 60% focal, 40% other states, 20% women" → settings shown and editable → preview counts → CSV (`list=custom`, spec re-validated on the server, logged). Focal/other shares are exact; women/PWD/rural are minimums, optionally "in the first N" (`lib/screening/customList.ts`). Counts: "how many women in the batch/top 1300/passed". Actions: "move Reviewer 4's unfinished work to the others", "send the passed to judges, 3 each" → preview → **Confirm** (same checked API as the buttons). Works without AI; if `AI_PROVIDER` is set the AI only turns the sentence into settings and never receives applicant data [VERIFIED by test]. [VERIFIED] 5 tests + Playwright on 6,238 seeded applications. |
+| Applicant status emails, self-service password reset by email | **[NOT BUILT]** |
 | Confirmation emails for the ~400 people who applied before emails existed | **[NOT BUILT]**. Offered as a batched one-off command. |
 
 ## 6. Known issues, errors and investigations
+- **NEW 16 Oct: 500 when assigning on /admin/judging** [USER-REPORTED, no server log seen]. Most likely a Sheets timeout (code NETWORK) on the user's connection. The assign screens now show `code` and `ref`; the matching `[api] ref=… code=…` line is in the server log. Write ranges now quote tab names (`'Panel Reviews'!A1`). If it recurs, get that log line.
+- **13 Oct timeout fix (v2026.10.14):** Applications and Panel Reviews are read in 1,000-row slices with gzip, one shared download, and a ≤10-minute stale fallback. Whether the user applied it is unknown.
+- **OPEN, top priority: "RangeError: Maximum call stack size exceeded at Set.has" on `/admin/judging`** [USER-REPORTED, 13 Oct, under `npm run dev` against the live sheet with 6,238 rows; page loads took up to 48 minutes].
+  - Not reproducible with the local JSON store, even at 6,238 rows.
+  - Likely cause: React 19.3 / Next 15.5 dev-mode async-debug tracking, overwhelmed by the page loading the whole sheet **4 times in parallel** (overview + results each called `loadApplications()`).
+  - **Fix shipped in the 13 Oct zip:** `judgingData = cache(async () => …)` in `reviewService.ts` loads applications, reviews and panelists once per request, sequentially. The page now catches load errors and shows "Judging could not load".
+  - **Not yet confirmed by the user.** Ask them to test in production mode (`npm run build && npm start`), not `npm run dev`.
+  - If it persists, likely next steps:
+    - stop loading full `Application` objects for judging (map rows to a slim summary in the repository)
+    - check the Sheets read path in `lib/google-sheets/client.ts` / `applications.ts`
+- **Because of that crash, the admin could not assign** and **judges saw nothing** [USER-REPORTED]. That is expected until assignments exist.
+- **"Invite and reset links need Redis (Upstash)…"** on the Staff page is an informational notice: Redis isn't configured in the user's environment. Accounts can be made with `npm run make-user` instead.
+- **Hosting move.** The user moved off Vercel (13 Oct). The new host needs every env var from §8, `NEXT_PUBLIC_SITE_URL` set to the new URL, build `npm run build`, start `npm start`, and the same GitHub repo/branch (`luwaden/agri-contest`, `main`). Then pause the Vercel project, so two deployments don't write to the same sheet.
+- Harmless build warnings: `jose` "Node.js API … not supported in the Edge Runtime" (from `lib/auth/session.ts` imported by the middleware), and git CRLF line-ending warnings on Windows. `npm audit` reports 10 vulnerabilities in dependencies; these haven't been reviewed.
+
 - **Confirmation emails land in Spam** [USER-REPORTED].
   - Cause: bulk identical mail from a new consumer Gmail account, with no domain of their own (no SPF/DKIM/DMARC under their control).
   - Done: removed web links (especially `vercel.app` ones), simplified the footer, added the spam note on the success page.
@@ -185,6 +204,8 @@ Details are in `docs/ACCESS_AND_LOGIN.md` and `docs/SECURITY_AUDIT.md`.
 - **Redis is optional.** Drafts in Redis fall back to the Drafts tab. The duplicate-email index seeds itself once from the sheet.
 - **The AI assistant is staff-only.** Public access was rejected by the user.
 - **One panel role per person**, per the user (9 Oct).
+- **Judging data model:** one Panel Reviews row = the assignment AND that person's score sheet (auditable). Scores **never** change application status automatically; a person does that. The average uses only SUBMITTED sheets, and a missing score is never treated as zero. Ties use the framework order originality → scalability → feasibility, then the moderation panel. The 20-point spread threshold is a working setting, not a programme rule. How many people per application is the admin's choice; the framework fixes no number. Panel members see the applicant name and business (needed to spot conflicts) but no contact details.
+- Judging writes use `appendMany` (one Sheets request per 500 rows) to respect the write quota.
 
 ## 8. Environment variables (names only)
 - **Required in production:**
@@ -206,7 +227,7 @@ Details are in `docs/ACCESS_AND_LOGIN.md` and `docs/SECURITY_AUDIT.md`.
 Which of these are actually set on Vercel is **[ASSUMED]**, except the Google settings (the store works) and the Gmail settings (email works, per the user).
 
 ## 9. Testing
-- **Automated:** `npm test` gives **65 passed, 0 failed** in my copy at version `2026.10.11` [VERIFIED]. It covers:
+- **Automated:** `npm test` gives **77 passed, 0 failed** [VERIFIED in my copy and in the user's pasted output on 13 Oct]. `tests/judging.test.ts` covers assignment balance and gap-filling, conflicts, self-exclusion, separate pools, score-sheet validation and totals, results and ties, privacy of `panelView`, the review row round trip, and assistant routing. The repository contract now includes reviews for all 3 transports. It covers:
   - validation for both forms
   - repository contract (local, fake Sheets, Apps Script)
   - header migration
@@ -244,20 +265,22 @@ Which of these are actually set on Vercel is **[ASSUMED]**, except the Google se
   - A single Google Sheet's quota (about 60 reads a minute per user). Redis reduces this; whether Redis is on in production is [ASSUMED].
   - My copy and the user's repo drift apart, for example in `config/programme.ts` (logo line) and possibly other local edits.
   - The application window closes on **16 Oct 2026 at 23:59 WAT**. After that, submissions return 403 by design.
-- **Live version:** `lib/version.ts` in my copy is **2026.10.11**. The live version is unknown. Check `/api/health` or run `check:live`.
+- **Live version:** `lib/version.ts` in my copy is **2026.10.13** (judging crash fix). The user pushed **2026.10.11** to GitHub `main` (commit `ca771d4`) and has **not yet pushed the 13 Oct fix**, as far as I know. Their local version string may also read 2026.10.13 from another chat's edits (they have an email feature I didn't build in this chat). The live version is unknown. Check `/api/health` or run `check:live`.
 
 ## 11. Exact next task
-1. **Confirm the current live state.**
-   - Ask the user to run `git status` and `npm run check:live -- https://agri-contest.vercel.app`, and paste both.
-   - Confirm `config/implementer.ts` exists, and whether `spam-update.zip` (3 files: `app/apply/success/page.tsx`, `lib/email/templates.ts`, `tests/email.test.ts`) has been applied and pushed.
-   - If not, apply it and push only those 3 paths.
-2. Then verify on a phone: submit a test application. Confirm:
-   - the success-page spam note
-   - the email arrives
-   - the row appears in the sheet
+**16 Oct (new):** apply the screening zip (changed files only) → `npm test` → `npm run preflight` → `npm run setup:sheets` (adds only the `decision` column) → `npm run build && npm start` → Admin → Screening: check step 1 counts, download the top list and read it before creating the batch. Then deploy to the new host (not known yet). Ask for the server log line if any 500 appears.
 
-   Then delete the row.
-3. Waiting on the user (offer, don't build unasked):
-   - (a) a batched, throttled command to send confirmations to the ~400 earlier applicants (under 500 a day, spread over time to protect deliverability)
-   - (b) moving email to their own domain with Resend, to fix spam properly
-   - (c) judge and reviewer assignments and scoring, which are needed before the 29 Oct finale
+Older list (13 Oct):
+1. **Get the judging crash fix live.**
+   - The user unzips the 13 Oct `agri-contest-platform.zip` over their repo and restores `.env`. Better: copy only `lib/services/reviewService.ts` and `app/admin/judging/page.tsx`, so local edits aren't overwritten.
+   - They run `npm test`, then `npm run build && npm start`, and open `/admin/judging` signed in as admin.
+   - Then they push.
+   - If the error persists in production mode, debug the Sheets read path (§6).
+2. **Confirm where the site is hosted now.** Get the new URL and confirm its env vars. Run `npm run check:live -- <new-url> --email <admin>`, then pause Vercel.
+3. **Do a first real assignment**, small: Judging → Screening, 1 per application, one state → Preview → Confirm. Then sign in as a reviewer in a private window, score one, and check Results. Withdraw the test if needed.
+4. **Turn on Upstash Redis** in production. It's needed for invite and reset links, shared rate limits and the duplicate-email index at this volume.
+5. **Carried over from 11 Oct:**
+   - (a) a batched confirmation-email sender for earlier applicants
+   - (b) email on their own domain (spam)
+   - (c) confirm the spam-note and implementer updates are live
+6. **Possible next features** (only if the user asks): a moderation role and workflow, bulk status changes from Results, written-feedback export, Tier-1 automatic screening flags.

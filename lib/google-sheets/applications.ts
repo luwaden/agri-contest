@@ -137,6 +137,21 @@ export class SheetsRepository implements ApplicationRepository {
     return next;
   }
 
+  async updateReviews(changes: Array<{ reviewId: string; patch: Partial<PanelReview> }>) {
+    const rows = await this.reviewRows(); const index = new Map(rows.map((r, i) => [r[0], i]));
+    const writes: Array<{ rowNumber: number; row: string[] }> = []; const out: PanelReview[] = []; const at = new Date().toISOString();
+    for (const { reviewId, patch } of changes) {
+      const i = index.get(reviewId); if (i === undefined) continue;
+      const cur = rowToReview(rows[i]); if (!cur) continue;
+      const next: PanelReview = { ...cur, ...patch, reviewId: cur.reviewId, applicationId: cur.applicationId, panelEmail: cur.panelEmail, updatedAt: patch.updatedAt ?? at };
+      rows[i] = reviewToRow(next); writes.push({ rowNumber: i + 2, row: rows[i] }); out.push(next);
+    }
+    if (!writes.length) return out;
+    if (this.sheets.updateRows) await this.sheets.updateRows(SHEETS.reviews, writes);
+    else for (const w of writes) await this.sheets.updateRow(SHEETS.reviews, w.rowNumber, w.row);
+    return out;
+  }
+
   async getEvents(limit = 200) {
     return (await this.sheets.read(SHEETS.events)).slice(1).filter((r) => r[0]).slice(-limit).reverse()
       .map((r) => ({ at: r[0], applicationId: r[1], actor: r[2], action: r[3], detail: r[4] ?? "" }));

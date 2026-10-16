@@ -91,20 +91,25 @@ export const sheets = {
   },
   async append(sheet: string, row: string[]) {
     forget(sheet);
-    await call(`/values/${enc(sheet)}!A1:append`, "POST", { values: [row] }, { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
+    await call(`/values/${enc(`${quoteTab(sheet)}!A1`)}:append`, "POST", { values: [row] }, { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
   },
   async appendMany(sheet: string, rows: string[][]) {
     forget(sheet);
     for (let i = 0; i < rows.length; i += 500)
-      await call(`/values/${enc(sheet)}!A1:append`, "POST", { values: rows.slice(i, i + 500) }, { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
+      await call(`/values/${enc(`${quoteTab(sheet)}!A1`)}:append`, "POST", { values: rows.slice(i, i + 500) }, { valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
   },
   async updateRow(sheet: string, rowNumber: number, row: string[]) {
     forget(sheet);
-    await call(`/values/${enc(`${sheet}!A${rowNumber}`)}`, "PUT", { values: [row] }, { valueInputOption: "RAW" });
+    await call(`/values/${enc(`${quoteTab(sheet)}!A${rowNumber}`)}`, "PUT", { values: [row] }, { valueInputOption: "RAW" });
+  },
+  async updateRows(sheet: string, rows: Array<{ rowNumber: number; row: string[] }>) {
+    forget(sheet);
+    for (let i = 0; i < rows.length; i += 500)
+      await call("/values:batchUpdate", "POST", { valueInputOption: "RAW", data: rows.slice(i, i + 500).map((r) => ({ range: `${quoteTab(sheet)}!A${r.rowNumber}`, values: [r.row] })) });
   },
   async clearRow(sheet: string, rowNumber: number, width: number) {
     forget(sheet);
-    await call(`/values/${enc(`${sheet}!A${rowNumber}:${width > 26 ? "ZZ" : "Z"}${rowNumber}`)}:clear`, "POST", {});
+    await call(`/values/${enc(`${quoteTab(sheet)}!A${rowNumber}:${width > 26 ? "ZZ" : "Z"}${rowNumber}`)}:clear`, "POST", {});
   },
   async batchUpdate(requests: unknown[]) {
     return call<any>(":batchUpdate", "POST", { requests });

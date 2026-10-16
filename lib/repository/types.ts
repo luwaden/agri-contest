@@ -50,6 +50,8 @@ export interface ApplicationRepository {
   /** Adds many at once. Rows whose (application, panel member) pair already exists are skipped; returns how many were added. */
   createReviews(reviews: PanelReview[]): Promise<number>;
   updateReview(reviewId: string, patch: Partial<Omit<PanelReview, "reviewId" | "applicationId" | "panelEmail">>): Promise<PanelReview | null>;
+  /** Many updates in one go (one Sheets request where the transport allows). Unknown ids are skipped. */
+  updateReviews(changes: Array<{ reviewId: string; patch: Partial<Omit<PanelReview, "reviewId" | "applicationId" | "panelEmail">> }>): Promise<PanelReview[]>;
   /** Cheap, read-only check used by /api/health?check=store. Never returns secrets. */
   diagnose(): Promise<StoreDiagnosis>;
   logEvent(event: AuditEvent): Promise<void>;
