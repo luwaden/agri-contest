@@ -3,14 +3,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Campaign = { campaignId: string; createdAt: string; createdBy: string; subject: string; audience: string; total: number; sent: number; failed: number; remaining: number; cancelled: boolean; lastErrors: string[] };
 type Overview = { campaigns: Campaign[]; sentToday: number; dailyLimit: number; sender: "gmail" | "resend" | "off"; senderProblem: string | null; from: string };
-type Preview = { count: number; label: string; notFound: string[]; sample: Array<{ applicationId: string; name: string; email: string }>; email: { subject: string; html: string; text: string; to: string } | null };
+type Preview = { count: number; others: number; warnings: string[]; label: string; notFound: string[]; sample: Array<{ applicationId: string; name: string; email: string }>; email: { subject: string; html: string; text: string; to: string } | null };
 
 const AUDIENCES = [
   ["passed", "Passed by reviewers"], ["batch", "Everyone with a screening reviewer"], ["judges", "Everyone with judges"],
-  ["finalists", "Top N by judges' scores"], ["top", "Top N eligible by pre-score"], ["status", "Everyone with a status"], ["pasted", "A list I paste (references or emails)"],
+  ["finalists", "Top N by judges' scores"], ["top", "Top N eligible by pre-score"], ["status", "Everyone with a status"],
+  ["staff", "Staff: judges, reviewers or everyone with an account"], ["mentors", "Panel applications (mentors, judges, reviewers who applied)"],
+  ["pasted", "Any email addresses (and/or applicant references) I paste"],
 ] as const;
 const STATUSES = ["SHORTLISTED", "FINALIST", "WINNER", "NOT_SELECTED", "UNDER_REVIEW", "SUBMITTED"];
-const FILL = ["first_name", "full_name", "application_id", "business_name", "state"];
+const FILL = ["first_name", "full_name", "application_id", "business_name", "state"];   // application_id and business_name are empty for people who are not applicants
 const STOP: Record<string, string> = {
   DAILY_LIMIT: "Today's sending limit is reached. Press Continue tomorrow; nobody will get it twice.",
   DAILY_LIMIT_OR_RATE_LIMIT: "The email service says the daily limit is reached. Continue tomorrow.",
@@ -31,6 +33,7 @@ export function Messages({ initial }: { initial: Overview }) {
   const [ov, setOv] = useState(initial);
   const [kind, setKind] = useState<string>("passed");
   const [n, setN] = useState(30); const [status, setStatus] = useState("SHORTLISTED"); const [pasted, setPasted] = useState("");
+  const [staffRole, setStaffRole] = useState("PANEL"); const [mentorStatus, setMentorStatus] = useState("ACCEPTED");
   const [subject, setSubject] = useState(""); const [heading, setHeading] = useState(""); const [body, setBody] = useState("Dear {first_name},\n\n");
   const [pv, setPv] = useState<Preview | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -40,7 +43,8 @@ export function Messages({ initial }: { initial: Overview }) {
   const [stopNote, setStopNote] = useState<Record<string, string>>({});
   const bodyRef = useRef<HTMLTextAreaElement>(null); const stopFlag = useRef(false);
 
-  const audience = () => (kind === "finalists" || kind === "top" ? { kind, n } : kind === "status" ? { kind, status } : kind === "pasted" ? { kind, text: pasted } : { kind });
+  const audience = () => (kind === "finalists" || kind === "top" ? { kind, n } : kind === "status" ? { kind, status } : kind === "pasted" ? { kind, text: pasted }
+    : kind === "staff" ? { kind, role: staffRole } : kind === "mentors" ? { kind, status: mentorStatus } : { kind });
   const message = () => ({ subject, heading, body, audience: audience() });
   const changed = () => { setPv(null); setConfirming(false); };
   const refresh = useCallback(async () => { const r = await api<Overview>(); if (r.ok) setOv(r.data); }, []);
@@ -99,8 +103,13 @@ export function Messages({ initial }: { initial: Overview }) {
           {kind === "status" && <label className="text-sm font-semibold">Status
             <select value={status} onChange={(e) => { setStatus(e.target.value); changed(); }} className={input}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select></label>}
         </div>
-        {kind === "pasted" && <label className="block text-sm font-semibold">References or email addresses <span className="font-normal text-ink-muted">(one per line, or separated by commas; you can paste a column from a CSV)</span>
-          <textarea rows={4} value={pasted} onChange={(e) => { setPasted(e.target.value); changed(); }} className={`${input} font-mono`} placeholder={"AGRA-2026-K7QX4M\nname@example.com"} /></label>}
+          {kind === "staff" && <label className="text-sm font-semibold">Who
+            <select value={staffRole} onChange={(e) => { setStaffRole(e.target.value); changed(); }} className={input}><option value="PANEL">Judges and reviewers</option><option value="JUDGE">Judges</option><option value="REVIEWER">Reviewers</option><option value="ALL">Everyone with an account</option></select></label>}
+          {kind === "mentors" && <label className="text-sm font-semibold">Panel application status
+            <select value={mentorStatus} onChange={(e) => { setMentorStatus(e.target.value); changed(); }} className={input}><option value="ACCEPTED">Accepted</option><option value="NEW">New</option><option value="UNDER_REVIEW">Under review</option><option value="DECLINED">Declined</option><option value="ANY">Any</option></select></label>}
+        {kind === "pasted" && <label className="block text-sm font-semibold">Email addresses and/or applicant references <span className="font-normal text-ink-muted">(any address works, not only applicants'; one per line; add a name if you like)</span>
+          <textarea rows={5} value={pasted} onChange={(e) => { setPasted(e.target.value); changed(); }} className={`${input} font-mono`} placeholder={"Amina Bello <amina@example.org>\npartner@agency.org, Musa Ibrahim\nAGRA-2026-K7QX4M\nsomeone@gmail.com"} />
+          <span className="mt-1 block text-xs font-normal text-ink-muted">An address that belongs to an applicant gets the applicant version (with their reference number). Everyone else gets the same message without it.</span></label>}
         <label className="block text-sm font-semibold">Subject
           <input value={subject} maxLength={150} onChange={(e) => { setSubject(e.target.value); changed(); }} className={input} placeholder="e.g. You have been shortlisted, {first_name}" /></label>
         <label className="block text-sm font-semibold">Heading in the email <span className="font-normal text-ink-muted">(optional; the subject is used if empty)</span>
@@ -119,8 +128,10 @@ export function Messages({ initial }: { initial: Overview }) {
 
         {pv && (
           <div className="space-y-3 rounded-lg border-2 border-primary p-4" aria-live="polite">
-            <p className="font-semibold">{pv.count === 0 ? "Nobody is in this group." : `${pv.label}: ${pv.count.toLocaleString("en-GB")} ${pv.count === 1 ? "person" : "people"} (one email each, submitted applications only).`}</p>
-            {pv.notFound.length > 0 && <p className="text-sm text-warn-fg">Not found ({pv.notFound.length}): {pv.notFound.slice(0, 10).join(", ")}{pv.notFound.length > 10 ? "…" : ""}</p>}
+            <p className="font-semibold">{pv.count === 0 ? "Nobody is in this group." : `${pv.label}: ${pv.count.toLocaleString("en-GB")} ${pv.count === 1 ? "person" : "people"} (one email each; for applicants, submitted applications only).`}</p>
+            {pv.others > 0 && <p className="text-sm text-ink-soft">{pv.others} of them {pv.others === 1 ? "is not an applicant" : "are not applicants"}: they get the message without a reference number.</p>}
+            {pv.warnings.map((w) => <p key={w} className="text-sm text-warn-fg">{w}</p>)}
+            {pv.notFound.length > 0 && <p className="text-sm text-warn-fg">Not understood or not found ({pv.notFound.length}): {pv.notFound.slice(0, 10).join(", ")}{pv.notFound.length > 10 ? "…" : ""}</p>}
             {pv.count > 0 && <>
               <details className="text-sm"><summary className="cursor-pointer font-semibold">First {pv.sample.length} recipients</summary><ul className="mt-1 space-y-0.5">{pv.sample.map((s) => <li key={s.applicationId} className="flex flex-wrap gap-x-3"><span className="font-mono text-xs text-ink-muted">{s.applicationId}</span><span>{s.name}</span><span className="text-ink-muted">{s.email}</span></li>)}</ul></details>
               {pv.email && <div><p className="text-sm"><span className="text-ink-muted">To</span> {pv.email.to} · <span className="text-ink-muted">Subject</span> <strong>{pv.email.subject}</strong></p>

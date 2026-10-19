@@ -21,7 +21,7 @@ export default async function MessagesPage() {
     <PortalShell>
       <div className="mx-auto max-w-4xl space-y-6">
         <div><h1 className="font-display text-3xl font-extrabold">Messages</h1>
-          <p className="mt-1 text-sm text-ink-soft">Email a chosen group of applicants. Each person gets their own copy, with their name and reference filled in. Every email is recorded in the Email Log tab.</p></div>
+          <p className="mt-1 text-sm text-ink-soft">Email applicants, your panel, or any other email address. Each person gets their own copy with their name filled in (and their reference number, if they applied). Every email is recorded in the Email Log tab.</p></div>
         <Messages initial={overview} />
       </div>
     </PortalShell>

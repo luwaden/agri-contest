@@ -11,17 +11,17 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const when = (iso: string | null | undefined) =>
   new Date(iso || Date.now()).toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " (WAT)";
 
-function layout(title: string, paragraphs: string[], ref: string): string {
+function layout(title: string, paragraphs: string[], ref: string | null, audience: "applicant" | "contact" = "applicant"): string {
   const body = paragraphs.map((p) => `<p style="margin:0 0 14px;line-height:1.55">${p}</p>`).join("");
   return `<!doctype html><html><body style="margin:0;background:#f4f6f2;font-family:Arial,Helvetica,sans-serif;color:#1d2a20">
 <div style="max-width:560px;margin:0 auto;padding:24px 16px">
 <div style="background:#0f3d24;color:#ffffff;border-radius:12px 12px 0 0;padding:18px 22px;font-weight:bold;font-size:16px">${esc(PROGRAMME.name)}</div>
 <div style="background:#ffffff;border-radius:0 0 12px 12px;padding:22px">
 <h1 style="margin:0 0 16px;font-size:20px;color:#0f3d24">${esc(title)}</h1>
-<div style="margin:0 0 18px;padding:12px 14px;background:#f0f7e6;border-radius:8px;font-size:14px">Reference number<br><strong style="font-family:Consolas,monospace;font-size:20px;letter-spacing:.5px">${esc(ref)}</strong></div>
+${ref ? `<div style="margin:0 0 18px;padding:12px 14px;background:#f0f7e6;border-radius:8px;font-size:14px">Reference number<br><strong style="font-family:Consolas,monospace;font-size:20px;letter-spacing:.5px">${esc(ref)}</strong></div>` : ""}
 ${body}
 </div>
-<p style="font-size:12px;color:#5b6b60;line-height:1.5;margin:14px 4px 0">You are receiving this because you applied to the ${esc(PROGRAMME.name)} with this email address. Delivered by ${esc(PROGRAMME.deliveredBy)} (${IMPLEMENTER_WEBSITE_LABEL}).</p>
+<p style="font-size:12px;color:#5b6b60;line-height:1.5;margin:14px 4px 0">${audience === "applicant" ? `You are receiving this because you applied to the ${esc(PROGRAMME.name)} with this email address.` : `Sent by the programme team of the ${esc(PROGRAMME.name)}.`} Delivered by ${esc(PROGRAMME.deliveredBy)} (${IMPLEMENTER_WEBSITE_LABEL}).</p>
 </div></body></html>`;
 }
 
@@ -53,8 +53,8 @@ export function applicantConfirmation(a: { applicationId: string; submittedAt: s
  * A message written by the programme team (Admin → Messages). The team's text is escaped (never raw HTML);
  * blank lines become paragraphs. Fill-ins have already been replaced by the caller with plain text.
  */
-export function teamMessage(m: { to: string; subject: string; heading: string; body: string; ref: string; key: string }): EmailMessage {
+export function teamMessage(m: { to: string; subject: string; heading: string; body: string; ref: string | null; key: string }): EmailMessage {
   const paras = m.body.trim().split(/\n\s*\n/).map((p) => esc(p.trim()).replace(/\n/g, "<br>"));
-  const text = [m.body.trim(), "", `Reference number: ${m.ref}`, "", `Delivered by ${PROGRAMME.deliveredBy}, ${IMPLEMENTER_WEBSITE_LABEL}`].join("\n");
-  return { to: m.to, subject: m.subject, html: layout(m.heading, paras, m.ref), text, idempotencyKey: m.key };
+  const text = [m.body.trim(), "", ...(m.ref ? [`Reference number: ${m.ref}`, ""] : []), `Delivered by ${PROGRAMME.deliveredBy}, ${IMPLEMENTER_WEBSITE_LABEL}`].join("\n");
+  return { to: m.to, subject: m.subject, html: layout(m.heading, paras, m.ref, m.ref ? "applicant" : "contact"), text, idempotencyKey: m.key };
 }
