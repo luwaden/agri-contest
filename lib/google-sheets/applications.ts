@@ -8,12 +8,16 @@ import { mentorToRow, rowToMentor } from "./mentorSchema";
 import { rowToStaff, staffToRow } from "./staffSchema";
 import { reviewToRow, rowToReview } from "./reviewSchema";
 import type { PanelReview } from "@/types/review";
+import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import type { StaffAccount } from "@/types/staff";
 import { classifyError } from "@/lib/http";
 import type { StoreDiagnosis } from "@/lib/repository/types";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
 
 /** Google Sheets implementation of ApplicationRepository. */
+const guardText = (s: string) => (/^[=+\-@]/.test(s) ? `'${s}` : s);
+const unguardText = (s: string) => (/^'[=+\-@]/.test(s) ? s.slice(1) : s);
+
 export class SheetsRepository implements ApplicationRepository {
   readonly kind = "sheets" as const;
   constructor(private readonly sheets: SheetTransport = restTransport) {}
@@ -150,6 +154,29 @@ export class SheetsRepository implements ApplicationRepository {
     if (this.sheets.updateRows) await this.sheets.updateRows(SHEETS.reviews, writes);
     else for (const w of writes) await this.sheets.updateRow(SHEETS.reviews, w.rowNumber, w.row);
     return out;
+  }
+
+  // ── messages to applicants (append-only) ──
+  async createEmailCampaign(c: EmailCampaign) {
+    await this.sheets.append(SHEETS.emailCampaigns, [c.campaignId, c.createdAt, guardText(c.createdBy), guardText(c.subject), guardText(c.body), guardText(c.audience), JSON.stringify(c.recipientIds)]);
+  }
+  async getEmailCampaigns(): Promise<EmailCampaign[]> {
+    return (await this.optionalRows(SHEETS.emailCampaigns)).filter((r) => r[0]).map((r) => {
+      let ids: string[] = []; try { const v = JSON.parse(r[6] || "[]"); if (Array.isArray(v)) ids = v.map(String); } catch { /* damaged cell: no recipients */ }
+      return { campaignId: r[0], createdAt: r[1] ?? "", createdBy: unguardText(r[2] ?? ""), subject: unguardText(r[3] ?? ""), body: unguardText(r[4] ?? ""), audience: unguardText(r[5] ?? ""), recipientIds: ids };
+    });
+  }
+  async getEmailLog(): Promise<EmailLogRow[]> {
+    return (await this.optionalRows(SHEETS.emailLog)).filter((r) => r[1]).map((r) => ({ at: r[0], campaignId: r[1], applicationId: r[2] ?? "", email: unguardText(r[3] ?? ""), status: (r[4] ?? "FAILED") as EmailLogRow["status"], detail: unguardText(r[5] ?? "") }));
+  }
+  async appendEmailLog(rows: EmailLogRow[]) {
+    if (!rows.length) return;
+    const out = rows.map((r) => [r.at, r.campaignId, r.applicationId, guardText(r.email), r.status, guardText(r.detail)]);
+    if (this.sheets.appendMany) await this.sheets.appendMany(SHEETS.emailLog, out); else for (const r of out) await this.sheets.append(SHEETS.emailLog, r);
+  }
+  private async optionalRows(tab: string) {
+    try { return (await this.sheets.read(tab)).slice(1); }
+    catch (e) { if (classifyError(e) === "SHEET_TAB_MISSING") throw new Error(`The "${tab}" tab does not exist yet. Run npm run setup:sheets once (it only adds the new tabs).`); throw e; }
   }
 
   async getEvents(limit = 200) {

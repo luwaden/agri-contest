@@ -9,6 +9,7 @@ type Reply =
   | { kind: "list"; spec: Spec; description: string; source: "ai" | "rules"; understood: string[]; unclear: string[]; report: Report }
   | { kind: "answer"; text: string; lines: Array<[string, string]> }
   | { kind: "action"; text: string; preview: Record<string, unknown>; confirm: Record<string, unknown> }
+  | { kind: "balanced"; spec: Record<string, unknown>; description: string; report: { total: number; notes: string[]; byState: Array<{ state: string; wanted: number; got: number; women: number; pwd: number; lgas: number; lgasAvailable: number; ages: Record<string, number> }> } }
   | { kind: "unclear"; text: string };
 
 const pct = (v: number | null) => (v == null ? "" : String(Math.round(v * 100)));
@@ -65,6 +66,24 @@ export function ScreeningAssistant({ examples, mayExport }: { examples: string[]
       {done && <p role="status" className="rounded-md bg-lime/40 px-3 py-2 text-sm font-semibold text-night">{done}</p>}
 
       {reply?.kind === "unclear" && <p className="rounded-md bg-warn-bg px-3 py-2 text-sm text-warn-fg">{reply.text}</p>}
+
+      {reply?.kind === "balanced" && (
+        <div className="space-y-3 rounded-lg border-2 border-primary p-4 text-sm" aria-live="polite">
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">I understood. Check it, then download.</p><p className="mt-1 font-semibold">{reply.description}</p></div>
+          <div className="overflow-x-auto rounded-md border border-paper-line">
+            <table className="w-full min-w-[560px] text-sm"><caption className="sr-only">Selection by state</caption>
+              <thead className="bg-paper-warm text-left text-xs text-ink-muted"><tr><th className="px-3 py-2">State</th><th className="px-3 py-2 text-right">Selected</th><th className="px-3 py-2 text-right">Women</th><th className="px-3 py-2 text-right">PWD</th><th className="px-3 py-2 text-right">LGAs covered</th><th className="px-3 py-2">Ages</th></tr></thead>
+              <tbody className="divide-y divide-paper-line">{reply.report.byState.map((s) => (
+                <tr key={s.state}><td className="px-3 py-1.5 font-semibold">{s.state}</td><td className="px-3 py-1.5 text-right tabular-nums">{s.got}{s.got < s.wanted ? ` of ${s.wanted}` : ""}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{s.women}{share(s.women, s.got)}</td><td className="px-3 py-1.5 text-right tabular-nums">{s.pwd}{share(s.pwd, s.got)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{s.lgas} of {s.lgasAvailable}</td><td className="px-3 py-1.5 tabular-nums text-ink-soft">{Object.entries(s.ages).sort().map(([k, v]) => `${k}: ${v}`).join(" · ")}</td></tr>))}</tbody>
+            </table>
+          </div>
+          {reply.report.notes.length > 0 && <ul className="list-disc space-y-0.5 pl-5 text-warn-fg">{reply.report.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+          {mayExport ? <a href={`/api/admin/screening/export?list=balanced&spec=${toB64url(reply.spec)}`} className="inline-flex rounded-full bg-primary px-5 py-2 font-semibold text-white">Download CSV ({reply.report.total})</a>
+            : <p className="text-warn-fg">Your role cannot download lists with personal data.</p>}
+        </div>
+      )}
 
       {reply?.kind === "answer" && (
         <div className="rounded-lg border border-paper-line p-4 text-sm" aria-live="polite">

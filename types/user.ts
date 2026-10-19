@@ -23,6 +23,7 @@ export type Permission =
   | "reports:view"
   | "scores:submit"
   | "mentors:review"
+  | "email:send"                 // Messages: email chosen groups of applicants (administrators only)
   | "ai:data"                    // AI data desk: reads all application data, writes only NEW "AI ·" tabs (administrators only)
   | "ai:query"
   | "export:data";

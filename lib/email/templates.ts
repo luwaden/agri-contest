@@ -48,3 +48,13 @@ export function applicantConfirmation(a: { applicationId: string; submittedAt: s
   ].join("\n");
   return { to: a.email, subject: `Application received: ${a.applicationId}`, html: layout("We have received your application", lines, a.applicationId), text, idempotencyKey: `app-confirm-${a.applicationId}` };
 }
+
+/**
+ * A message written by the programme team (Admin → Messages). The team's text is escaped (never raw HTML);
+ * blank lines become paragraphs. Fill-ins have already been replaced by the caller with plain text.
+ */
+export function teamMessage(m: { to: string; subject: string; heading: string; body: string; ref: string; key: string }): EmailMessage {
+  const paras = m.body.trim().split(/\n\s*\n/).map((p) => esc(p.trim()).replace(/\n/g, "<br>"));
+  const text = [m.body.trim(), "", `Reference number: ${m.ref}`, "", `Delivered by ${PROGRAMME.deliveredBy}, ${IMPLEMENTER_WEBSITE_LABEL}`].join("\n");
+  return { to: m.to, subject: m.subject, html: layout(m.heading, paras, m.ref), text, idempotencyKey: m.key };
+}

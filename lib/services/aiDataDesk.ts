@@ -10,6 +10,7 @@ import { buildResults } from "@/lib/judging";
 import type { Application } from "@/types/application";
 import type { PreScore } from "@/lib/screening";
 import { rankedData, toCsv } from "./screeningService";
+import { balancedSelect, ageBand } from "@/lib/screening/balanced";
 
 /**
  * AI DATA DESK (administrators only).
@@ -22,7 +23,7 @@ import { rankedData, toCsv } from "./screeningService";
  * because that stays in the programme's own Google account.
  */
 export const fullAccess = () => process.env.AI_FULL_DATA_ACCESS === "true";
-const MAX_STEPS = 10, AI_ROWS = 50, SHEET_ROWS = 20_000, TEXT_TO_AI = 600;
+const MAX_STEPS = 8, AI_ROWS = 50, SHEET_ROWS = 20_000, TEXT_TO_AI = 600;
 
 // ───────────── the data the AI can see ─────────────
 type Ctx = { s?: PreScore; reviewer?: string; reviewStatus?: string; passed?: boolean; judges?: number | null; zone: string };
@@ -182,7 +183,24 @@ async function runTool(name: string, args: Record<string, unknown>, rows: Row[],
     await getRepository().logEvent({ at: new Date().toISOString(), applicationId: "-", actor, action: "AI_SHEET_CREATED", detail: `${tab ?? "(CSV only)"} | ${body.length} rows | ${header.join(",").slice(0, 300)}` }).catch(() => {});
     return { created: true, rows: body.length, tab: tab ?? "(download only)", ...(sheetError ? { note: `New tab could not be created (${sheetError}); the CSV download is ready.` } : {}) };
   }
-  throw new Error(`Unknown tool "${name}". Use search, count, get_application or create_sheet.`);
+  if (name === "balanced_sheet") {
+    const per = (args.per_state && typeof args.per_state === "object" ? args.per_state : {}) as Record<string, unknown>;
+    const perState = Object.fromEntries(Object.entries(per).map(([k, v]) => [k, Math.max(0, Math.min(5000, Math.round(Number(v) || 0)))]).filter(([, v]) => (v as number) > 0)) as Record<string, number>;
+    if (!Object.keys(perState).length) throw new Error("balanced_sheet needs per_state, e.g. {\"Kaduna\":60}.");
+    const share = (v: unknown) => (v == null || v === "" ? null : Math.max(0, Math.min(1, Number(v) > 1 ? Number(v) / 100 : Number(v))));
+    const d = await rankedData();
+    const r = balancedSelect(d.ranked, d.applications, { perState, minWomenShare: share(args.min_women_share), minPwdShare: share(args.min_pwd_share),
+      minEachAgeBandShare: share(args.min_each_age_band_share), spreadLga: args.spread_lga !== false, lgaCap: share(args.lga_cap ?? 0.25) });
+    const fields = (Array.isArray(args.fields) && args.fields.length ? args.fields : ["first_name", "last_name", "email", "phone", "gender", "age", "state", "lga", "business_name", "value_chain", "pre_score", "strengths"]) as string[];
+    check(fields, false);
+    const byId = new Map(rows.map((x) => [x.a.applicationId, x]));
+    const header = ["#", "application_id", ...fields.filter((f) => f !== "application_id"), "disability", "age_band", "placed_by"];
+    const body = r.rows.map((x) => { const row = byId.get(x.applicationId)!; return [String(x.position), x.applicationId, ...fields.filter((f) => f !== "application_id").map((f) => cell(val(row, f))), row.a.inclusion.disability, ageBand(row.a.applicant.age), x.placedBy]; });
+    if (!body.length) return { error: "No eligible applicants matched those states." };
+    const res = await runTool("create_sheet", { title: String(args.title ?? "Balanced selection"), columns: header, rows: body.slice(0, 1000) }, rows, actor, made);
+    return { ...(res as object), by_state: r.byState, notes: r.notes };
+  }
+  throw new Error(`Unknown tool "${name}". Use search, count, get_application, create_sheet or balanced_sheet.`);
 }
 
 // ───────────── the conversation ─────────────
@@ -196,9 +214,11 @@ Reply with exactly ONE JSON object and nothing else:
   {"tool":"get_application","args":{"application_id":"AGRA-2026-XXXXXX"}}
   {"tool":"create_sheet","args":{"title":"…","filters":[...],"sort":[...],"fields":[...],"limit":1300,"notes":{"AGRA-…":"your note"},"notes_column":"Why shortlisted"}}
   {"tool":"create_sheet","args":{"title":"…","columns":["…"],"rows":[["…"]]}}
+  {"tool":"balanced_sheet","args":{"title":"…","per_state":{"Kaduna":60,"Niger":60,"Nasarawa":60},"min_women_share":0.2,"min_pwd_share":0.1,"min_each_age_band_share":0.15,"spread_lga":true,"lga_cap":0.25,"fields":["first_name","last_name","email","phone","gender","age","state","lga","business_name","value_chain","pre_score"]}}
   {"answer":"your final answer in plain English for the administrator"}
 Filter ops: eq, neq, in (value is a list), contains, gte, lte, exists. search returns at most ${AI_ROWS} rows per call (use offset), long answers cut to ${TEXT_TO_AI} characters; count works on all rows; create_sheet works on up to ${SHEET_ROWS} rows directly, so for big lists describe them with filters and sort rather than listing rows.
 Fields: ${list}.
+For any request that fixes numbers per state and/or asks for minimum shares of women, PWD, age mix or LGA spread, call balanced_sheet ONCE: it picks the best eligible applicants under all those rules over every row and creates the sheet. Do not try to pick such lists yourself with search. Age bands are 18–24, 25–29, 30–35.
 Rules: base every number on tool results, never guess; say how many records a statement covers; the pre_score is an automatic estimate, not a judge's decision; be brief and plain; at most ${MAX_STEPS} tool calls.`;
 }
 
@@ -221,7 +241,11 @@ export async function askDataDesk(question: string, history: AIMessage[], actor:
   const steps: string[] = [], made: Out[] = [];
   let answer = "";
   for (let i = 0; i <= MAX_STEPS; i++) {
-    const out = await ai.complete({ system: systemPrompt(), messages, maxTokens: 1500 });
+    let out = await ai.complete({ system: systemPrompt(), messages, maxTokens: 4000 });
+    if (!out.text.trim()) {   // some models spend the whole budget thinking and return nothing: ask once more, briefly
+      out = await ai.complete({ system: systemPrompt(), messages: [...messages, { role: "user", content: "Your last reply was empty. Reply now with exactly one JSON object (a tool call or the answer)." }], maxTokens: 4000 });
+      if (!out.text.trim()) { answer = "The AI returned an empty reply twice, so I stopped. Nothing was changed." + (made.length ? " The sheet(s) below were already created." : " Please try again, or ask for a smaller list."); break; }
+    }
     const r = parseReply(out.text);
     if (!r.tool || i === MAX_STEPS) { answer = r.answer ?? (r.tool ? "I needed more steps than allowed. Please narrow the request." : out.text); break; }
     let result: unknown;
@@ -241,6 +265,6 @@ function describeStep(tool: string, args: Record<string, unknown>, result: unkno
   if (tool === "search") return `Searched applications: ${r.matched} matched`;
   if (tool === "count") return `Counted: ${r.count}${args.group_by ? ` by ${args.group_by}` : ""}`;
   if (tool === "get_application") return `Opened ${String(args.application_id)}`;
-  if (tool === "create_sheet") return `Created ${r.tab} (${r.rows} rows)`;
+  if (tool === "create_sheet" || tool === "balanced_sheet") return `Created ${r.tab} (${r.rows} rows)`;
   return tool;
 }

@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 
 type Output = { id: string; title: string; tab: string | null; url: string | null; rows: number };
-type Turn = { q: string; answer?: string; steps?: string[]; outputs?: Output[]; error?: string };
+type Turn = { q: string; done?: boolean; answer?: string; steps?: string[]; outputs?: Output[]; error?: string };
 
 const EXAMPLES = [
   "Create a sheet of the 1300 best eligible applicants, 60% from focal states, with name, phone, email, state and pre-score",
@@ -25,8 +25,8 @@ export function DataDesk({ ready, fullAccess, tabsOn }: { ready: boolean; fullAc
     try {
       const res = await fetch("/api/admin/ai-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, history }) });
       const d = await res.json().catch(() => ({}));
-      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? (res.ok ? { ...x, ...d } : { ...x, error: `${d.message ?? "That did not work."}${d.code ? ` (code ${d.code}${d.ref ? `, ref ${d.ref}` : ""})` : ""}` }) : x)));
-    } catch { setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: "Could not reach the server." } : x))); }
+      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? (res.ok ? { ...x, ...d, done: true } : { ...x, done: true, error: `${d.message ?? "That did not work."}${d.code ? ` (code ${d.code}${d.ref ? `, ref ${d.ref}` : ""})` : ""}` }) : x)));
+    } catch { setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, done: true, error: "Could not reach the server." } : x))); }
     finally { setBusy(false); setTimeout(() => end.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 50); }
   }
 
@@ -51,7 +51,8 @@ export function DataDesk({ ready, fullAccess, tabsOn }: { ready: boolean; fullAc
           <li key={i} className="space-y-2">
             <p className="ml-auto max-w-[85%] whitespace-pre-wrap rounded-lg bg-primary px-4 py-2.5 text-sm text-white sm:max-w-[70%]">{t.q}</p>
             <div className="max-w-[95%] rounded-lg border border-paper-line bg-white px-4 py-3 text-sm sm:max-w-[85%]" aria-live="polite">
-              {!t.answer && !t.error && <p className="text-ink-muted">Working through the data… (large requests can take a minute)</p>}
+              {!t.done && <p className="text-ink-muted">Working through the data… (large requests can take a minute or two)</p>}
+              {t.done && !t.error && !t.answer && !t.outputs?.length && <p className="font-semibold text-warn-fg">The AI finished without an answer or a sheet. Nothing was changed. Please send the request again.</p>}
               {t.error && <p role="alert" className="font-semibold text-danger-fg">{t.error}</p>}
               {t.answer && <p className="whitespace-pre-wrap leading-relaxed">{t.answer}</p>}
               {t.outputs && t.outputs.length > 0 && (

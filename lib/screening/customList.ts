@@ -180,3 +180,26 @@ export function buildList(ranked: PreScore[], applications: Application[], spec:
     notes,
   };
 }
+
+// ───────────── "60 each from Kaduna, Niger, Nasarawa …" → a balanced selection ─────────────
+const stateAliases = (s: string) => [s, ...(s === "Nasarawa" ? ["Nassarawa", "Nasarrawa"] : []), ...(s === "Federal Capital Territory" ? ["FCT", "Abuja"] : [])];
+export function parseBalanced(text: string): { perState: Record<string, number>; minWomenShare: number | null; minPwdShare: number | null; minEachAgeBandShare: number | null; spreadLga: boolean; lgaCap: number } | null {
+  const t = ` ${text.replace(/\s+/g, " ")} `;
+  const mentioned = (NIGERIAN_STATES as readonly string[]).map((s) => ({ s, at: Math.min(...stateAliases(s).map((a) => { const m = new RegExp(`\\b${a}\\b`, "i").exec(t); return m ? m.index : Infinity; })) }))
+    .filter((x) => x.at !== Infinity).sort((a, b) => a.at - b.at).map((x) => x.s);
+  if (!mentioned.length) return null;
+  const perState: Record<string, number> = {};
+  const each = /(\d{1,4})\s*(?:people|persons|applicants|candidates)?\s*(?:each|per state|from each)/i.exec(t);
+  if (each) for (const s of mentioned) perState[s] = Number(each[1]);
+  for (const s of mentioned) for (const a of stateAliases(s)) {
+    const m = new RegExp(`(\\d{1,4})\\s*(?:people|persons|applicants|candidates)?\\s*(?:from|in)\\s+${a}\\b`, "i").exec(t) ?? new RegExp(`\\b${a}\\b\\s*[:(\\-–]?\\s*(\\d{1,4})\\b(?!\\s*%)`, "i").exec(t);
+    if (m) perState[s] = Number(m[1]);
+  }
+  if (!Object.keys(perState).length) return null;
+  const pwd = /(\d{1,3})\s*(?:%|percent)\s*(?:of\s+)?(?:pwds?|persons? with disabilit|people with disabilit|disabled)/i.exec(t) ?? /(?:pwds?|disabilit\w*|disabled)\s*[^\d%]{0,12}(\d{1,3})\s*(?:%|percent)/i.exec(t);
+  return {
+    perState, minWomenShare: pct(t, "women|female|girls"), minPwdShare: pwd ? Math.min(1, Number(pwd[1]) / 100) : null,
+    minEachAgeBandShare: /\bage\b|ages\b|young and old|age (?:mix|group|demograph)/i.test(t) ? 0.15 : null,
+    spreadLga: /\blgas?\b|local government/i.test(t), lgaCap: 0.25,
+  };
+}

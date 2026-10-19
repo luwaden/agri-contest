@@ -97,6 +97,12 @@ async function contract(name: string, repo: ApplicationRepository) {
   const after = await repo.getReviews();
   assert.deepEqual([after.find((r) => r.reviewId === "RV-1")!.status, after.find((r) => r.reviewId === "RV-3")!.decision, after.find((r) => r.reviewId === "RV-2")!.total, after.find((r) => r.reviewId === "RV-4")!.decision],
     ["WITHDRAWN", "PASS", 71, null], `${name}: batch update round trip, others untouched`);
+  // messages (append-only)
+  const camp = { campaignId: "MSG-1", createdAt: "2026-10-19T10:00:00Z", createdBy: "a@example.org", subject: "=Hello {first_name}", body: "#Heading\nLine 1\n\nLine 2, \"quoted\"", audience: "Passed (2)", recipientIds: ["AGRA-2026-AAAAA2", "AGRA-2026-AAAAA3"] };
+  await repo.createEmailCampaign(camp);
+  assert.deepEqual(await repo.getEmailCampaigns(), [camp], `${name}: campaign round trip`);
+  await repo.appendEmailLog([{ at: "2026-10-19T10:01:00Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA2", email: "k@example.com", status: "SENT", detail: "em_1" }, { at: "2026-10-19T10:01:01Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA3", email: "l@example.com", status: "FAILED", detail: "-TIMEOUT" }]);
+  const lg = await repo.getEmailLog(); assert.equal(lg.length, 2); assert.equal(lg[1].detail, "-TIMEOUT", `${name}: log round trip (guarded text)`);
 }
 
 test("repository contract: local JSON store", async () => { const { LocalRepository } = await import("../lib/repository/local"); await contract("local", new LocalRepository()); });

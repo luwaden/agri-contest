@@ -1,6 +1,8 @@
 import "server-only";
 import { getAIProvider } from "@/lib/ai";
-import { listSpecSchema, parseRequest, describeSpec, buildList, isFocal, type ListSpec } from "@/lib/screening/customList";
+import { listSpecSchema, parseRequest, describeSpec, buildList, isFocal, parseBalanced, type ListSpec } from "@/lib/screening/customList";
+import { balancedSelect, ageBand, type BalancedSpec } from "@/lib/screening/balanced";
+import { z } from "zod";
 import { SCREENING } from "@/config/screening";
 import { FOCAL_STATES, zoneOf } from "@/config/admin";
 import { VALUE_CHAINS } from "@/config/programme";
@@ -19,7 +21,37 @@ export type AssistantReply =
   | { kind: "list"; spec: ListSpec; description: string; source: "ai" | "rules"; understood: string[]; unclear: string[]; report: Awaited<ReturnType<typeof listPreview>> }
   | { kind: "answer"; text: string; lines: Array<[string, string]> }
   | { kind: "action"; text: string; preview: Record<string, unknown>; confirm: Record<string, unknown> }
+  | { kind: "balanced"; spec: BalancedSpec; description: string; report: { byState: ReturnType<typeof balancedSelect>["byState"]; notes: string[]; total: number } }
   | { kind: "unclear"; text: string };
+
+export const balancedSpecSchema = z.object({
+  perState: z.record(z.string().max(40), z.number().int().min(1).max(5000)).refine((o) => Object.keys(o).length >= 1 && Object.keys(o).length <= 37, "Name 1 to 37 states."),
+  minWomenShare: z.number().min(0).max(1).nullable().default(null), minPwdShare: z.number().min(0).max(1).nullable().default(null),
+  minEachAgeBandShare: z.number().min(0).max(0.33).nullable().default(null), spreadLga: z.boolean().default(false), lgaCap: z.number().min(0.05).max(1).nullable().default(0.25),
+});
+export function describeBalanced(s: BalancedSpec) {
+  const total = Object.values(s.perState).reduce((a, b) => a + b, 0);
+  const parts = [`${total} of the best eligible applicants: ${Object.entries(s.perState).map(([k, v]) => `${v} from ${k}`).join(", ")}`];
+  if (s.minWomenShare) parts.push(`at least ${Math.round(s.minWomenShare * 100)}% women in each state`);
+  if (s.minPwdShare) parts.push(`at least ${Math.round(s.minPwdShare * 100)}% persons with disability in each state`);
+  if (s.minEachAgeBandShare) parts.push(`a mix of ages (at least ${Math.round(s.minEachAgeBandShare * 100)}% in each of 18–24, 25–29, 30–35)`);
+  if (s.spreadLga) parts.push(`spread across LGAs (every LGA with eligible applicants gets a place where possible; no LGA takes more than ${Math.round((s.lgaCap ?? 1) * 100)}% of a state's places)`);
+  return parts.join("; ") + ".";
+}
+async function balancedPreview(spec: BalancedSpec): Promise<AssistantReply> {
+  const d = await rankedData();
+  const r = balancedSelect(d.ranked, d.applications, spec);
+  return { kind: "balanced", spec, description: describeBalanced(spec), report: { byState: r.byState, notes: r.notes, total: r.rows.length } };
+}
+/** CSV for a balanced selection (the spec is validated again: it comes back from the browser). */
+export async function balancedCsv(raw: unknown) {
+  const spec = balancedSpecSchema.parse(raw);
+  const d = await rankedData();
+  const r = balancedSelect(d.ranked, d.applications, spec);
+  const rows = r.rows.map((x) => { const a = d.apps.get(x.applicationId); return [x.position, x.overallRank, x.applicationId, a ? ageBand(a.applicant.age) : "", a?.inclusion.disability === "YES" ? "yes" : "no", x.placedBy, ...csvPersonCells(a), ...csvScoreCells(d.byId.get(x.applicationId))]; });
+  return { rows: rows.length, filename: `selection-${rows.length}-${new Date().toISOString().slice(0, 10)}.csv`, description: describeBalanced(spec),
+    csv: toCsv(["position", "overall_rank", "application_id", "age_band", "pwd", "placed_by", ...CSV_PERSON_COLUMNS, ...CSV_SCORE_COLUMNS], rows) };
+}
 
 const EXAMPLES = [
   "Send the CSV of the best 1300, 60% from focal states, 40% from other states, at least 20% women",
@@ -128,7 +160,11 @@ async function proposeJudges(text: string): Promise<AssistantReply> {
 }
 
 /** Entry point: a sentence, or corrected settings from the preview form. */
-export async function ask(input: { text?: string; spec?: unknown }): Promise<AssistantReply> {
+export async function ask(input: { text?: string; spec?: unknown; balanced?: unknown }): Promise<AssistantReply> {
+  if (input.balanced) {
+    const p = balancedSpecSchema.safeParse(input.balanced);
+    return p.success ? balancedPreview(p.data) : { kind: "unclear", text: p.error.issues[0]?.message ?? "Please check the settings." };
+  }
   if (input.spec) {
     const p = listSpecSchema.safeParse(input.spec);
     if (!p.success) return { kind: "unclear", text: p.error.issues[0]?.message ?? "Please check the settings." };
@@ -140,6 +176,8 @@ export async function ask(input: { text?: string; spec?: unknown }): Promise<Ass
   if (/\b(move|reassign|share out|give)\b.*\b(work|applications?|assignments?)\b/.test(t) && !/csv|list|download/.test(t)) return proposeMove(text);
   if (/\bsend\b.*\bpassed\b.*\bjudges?\b|\bto (the )?judges\b/.test(t) && !/csv|download/.test(t)) return proposeJudges(text);
   if (/^(how many|what share|what percentage|what is the (make[- ]?up|split)|breakdown|composition)|\bhow many\b/.test(t)) return answer(text);
+  const bal = parseBalanced(text);
+  if (bal) return balancedPreview(bal);
   if (/csv|list|download|send|give me|generate|best|top|shortlist|\d+\s*%/.test(t)) {
     const rules = parseRequest(text, { size: SCREENING.shortlistSize });
     const fromAi = await aiSpec(text);

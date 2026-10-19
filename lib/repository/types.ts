@@ -1,3 +1,4 @@
+import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import type { Application, ApplicationStatus } from "@/types/application";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
 import type { StaffAccount } from "@/types/staff";
@@ -52,6 +53,11 @@ export interface ApplicationRepository {
   updateReview(reviewId: string, patch: Partial<Omit<PanelReview, "reviewId" | "applicationId" | "panelEmail">>): Promise<PanelReview | null>;
   /** Many updates in one go (one Sheets request where the transport allows). Unknown ids are skipped. */
   updateReviews(changes: Array<{ reviewId: string; patch: Partial<Omit<PanelReview, "reviewId" | "applicationId" | "panelEmail">> }>): Promise<PanelReview[]>;
+  // Messages to applicants (append-only: campaigns are never edited; the log only grows).
+  createEmailCampaign(c: EmailCampaign): Promise<void>;
+  getEmailCampaigns(): Promise<EmailCampaign[]>;
+  getEmailLog(): Promise<EmailLogRow[]>;
+  appendEmailLog(rows: EmailLogRow[]): Promise<void>;
   /** Cheap, read-only check used by /api/health?check=store. Never returns secrets. */
   diagnose(): Promise<StoreDiagnosis>;
   logEvent(event: AuditEvent): Promise<void>;

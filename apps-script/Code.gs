@@ -175,6 +175,23 @@ var TABS = {
     "updated_at",
     "submitted_at",
     "decision"
+  ],
+  "Email Campaigns": [
+    "campaign_id",
+    "created_at",
+    "created_by",
+    "subject",
+    "body",
+    "audience",
+    "recipient_ids_json"
+  ],
+  "Email Log": [
+    "at",
+    "campaign_id",
+    "application_id",
+    "email",
+    "status",
+    "detail"
   ]
 };
 

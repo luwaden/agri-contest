@@ -1,3 +1,4 @@
+import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -7,7 +8,7 @@ import type { MentorApplication, MentorStatus } from "@/types/mentor";
 import type { StaffAccount } from "@/types/staff";
 import type { PanelReview } from "@/types/review";
 
-interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[] }
+interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[]; campaigns?: EmailCampaign[]; emailLog?: EmailLogRow[] }
 const FILE = path.join(process.cwd(), ".data", "dev-store.json");
 
 let queue: Promise<unknown> = Promise.resolve();
@@ -97,4 +98,8 @@ export class LocalRepository implements ApplicationRepository {
     }
     await save(s); return out;
   });
+  createEmailCampaign = (c: EmailCampaign) => serial(async () => { const s = await load(); (s.campaigns ??= []).push(c); await save(s); });
+  getEmailCampaigns = () => serial(async () => (await load()).campaigns ?? []);
+  getEmailLog = () => serial(async () => (await load()).emailLog ?? []);
+  appendEmailLog = (rows: EmailLogRow[]) => serial(async () => { const s = await load(); (s.emailLog ??= []).push(...rows); await save(s); });
 }

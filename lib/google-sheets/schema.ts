@@ -16,6 +16,8 @@ export const SHEETS = {
   judges: "Judges",
   configuration: "Configuration",
   reviews: "Panel Reviews",
+  emailCampaigns: "Email Campaigns",
+  emailLog: "Email Log",
 } as const;
 
 type Kind = "s" | "n" | "b" | "l" | "j";
@@ -67,6 +69,8 @@ export const HEADERS = {
   [SHEETS.judges]: ["judge_id", "name", "email", "active", "conflict_declared", "assigned_application_ids"],
   [SHEETS.configuration]: ["key", "value", "updated_at", "updated_by"],
   [SHEETS.reviews]: REVIEW_HEADERS,
+  [SHEETS.emailCampaigns]: ["campaign_id", "created_at", "created_by", "subject", "body", "audience", "recipient_ids_json"],
+  [SHEETS.emailLog]: ["at", "campaign_id", "application_id", "email", "status", "detail"],
 } as const;
 
 const get = (obj: any, path: string) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);

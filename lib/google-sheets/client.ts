@@ -80,7 +80,7 @@ const enc = encodeURIComponent;
 const quoteTab = (sheet: string) => `'${sheet.replace(/'/g, "''")}'`;
 
 /** Tabs that grow into thousands of rows. They are read in slices; small tabs keep the single request. */
-const LARGE_TABS = new Set(["Applications", "Panel Reviews"]);
+const LARGE_TABS = new Set(["Applications", "Panel Reviews", "Email Log"]);
 const CHUNK_ROWS = 3000;   // with gzip a 3,000-row slice is small; fewer slices = fewer reads against the quota
 
 async function readWhole(sheet: string): Promise<string[][]> {

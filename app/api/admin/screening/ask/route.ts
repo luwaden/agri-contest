@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   try {
     const rl = await rateLimit(`screen-ask:${auth.user.email}:${clientIp(req)}`, 60, 10 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfter);
-    const body = ((await readJson(req, 8_000)) ?? {}) as { text?: unknown; spec?: unknown };
-    return NextResponse.json(await ask({ text: typeof body.text === "string" ? body.text : undefined, spec: body.spec }), { headers: { "Cache-Control": "no-store" } });
+    const body = ((await readJson(req, 8_000)) ?? {}) as { text?: unknown; spec?: unknown; balanced?: unknown };
+    return NextResponse.json(await ask({ text: typeof body.text === "string" ? body.text : undefined, spec: body.spec, balanced: body.balanced }), { headers: { "Cache-Control": "no-store" } });
   } catch (e) { return serverError(e); }
 }

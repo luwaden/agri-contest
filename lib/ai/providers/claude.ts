@@ -5,9 +5,10 @@ export class ClaudeProvider implements AIProvider {
   readonly name = "claude" as const;
   configured() { return Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_MODEL); }
   async complete({ system, messages, maxTokens = 700 }: { system: string; messages: AIMessage[]; maxTokens?: number }): Promise<AICompletion> {
+    maxTokens = Math.max(maxTokens, Number(process.env.AI_MAX_OUTPUT_TOKENS) || 0);   // no "thinking" is requested from Claude, so the whole budget is for the reply
     const model = process.env.ANTHROPIC_MODEL!;
     const res = await fetch(`${process.env.ANTHROPIC_API_BASE || "https://api.anthropic.com"}/v1/messages`, {
-      method: "POST", signal: AbortSignal.timeout(40_000),
+      method: "POST", signal: AbortSignal.timeout(120_000),
       headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({ model, max_tokens: maxTokens, system, messages }),
     });

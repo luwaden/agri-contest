@@ -104,3 +104,39 @@ test("assistant: lists, counts, proposed moves (nothing written until confirmed)
     assert.equal(fallback.kind === "list" && fallback.source, "rules");
   } finally { globalThis.fetch = realFetch; delete process.env.AI_PROVIDER; }
 });
+
+// ───────── balanced selection: "60 each from Kaduna, Niger, Nasarawa, 20% women, 10% PWD, mixed ages, LGA spread" ─────────
+test("balanced selection: exact numbers per state, minimums met, LGAs spread, ages mixed, best otherwise", async () => {
+  const { balancedSelect, ageBand } = await import("../lib/screening/balanced");
+  const { parseBalanced } = await import("../lib/screening/customList");
+  const data = variedApplications(4000, 33).map((a, i) => {
+    a.location.state = ["Kaduna", "Niger", "Nasarawa", "Lagos"][i % 4]; a.location.lga = `LGA ${i % 13}`;
+    a.inclusion.disability = i % 23 === 0 ? "YES" : "NO"; a.applicant.gender = i % 9 === 0 ? "FEMALE" : "MALE";   // few women, few PWD: the minimums must do work
+    return a;
+  });
+  const rk = rankEligible(preScreen(data), data); const by = new Map(data.map((a) => [a.applicationId, a]));
+  const spec = parseBalanced("currently we need 180 people (60 people each from kaduna, niger, nassarawa only), 20% women  included, Pwds 10%, Mix the age demography, the gender too, and the LGA spread for representation")!;
+  assert.deepEqual(spec.perState, { Kaduna: 60, Niger: 60, Nasarawa: 60 });
+  const r = balancedSelect(rk, data, spec);
+  assert.equal(r.rows.length, 180); assert.equal(new Set(r.rows.map((x) => x.applicationId)).size, 180);
+  for (const s of r.byState) {
+    assert.equal(s.got, 60, s.state);
+    assert.ok(s.women >= 12, `${s.state} women ${s.women}`); assert.ok(s.pwd >= 6, `${s.state} pwd ${s.pwd}`);
+    assert.equal(s.lgas, s.lgasAvailable, `${s.state}: every LGA represented`);
+    for (const band of ["18–24", "25–29", "30–35"]) assert.ok((s.ages[band] ?? 0) >= 9 || r.notes.some((n) => n.includes(`age ${band}`)), `${s.state} ${band}`);
+    const perLga = new Map<string, number>(); for (const x of r.rows.filter((y) => y.state === s.state)) perLga.set(x.lga, (perLga.get(x.lga) ?? 0) + 1);
+    assert.ok(Math.max(...perLga.values()) <= 15, `${s.state}: one LGA took ${Math.max(...perLga.values())} places`);
+  }
+  assert.ok(r.rows.every((x) => by.get(x.applicationId)!.location.state !== "Lagos"), "only the named states");
+  // Nobody placed "by rank" in a state is weaker than someone left out of that state, unless a rule needed that place.
+  for (const st of ["Kaduna", "Niger", "Nasarawa"]) {
+    const picked = new Set(r.rows.filter((x) => x.state === st).map((x) => x.applicationId));
+    const worstByRank = Math.max(...r.rows.filter((x) => x.state === st && x.placedBy === "Rank").map((x) => x.overallRank));
+    const better = rk.slice(0, worstByRank).filter((p) => by.get(p.applicationId)!.location.state === st && !picked.has(p.applicationId)).length;
+    assert.ok(better <= 15, `${st}: ${better} stronger applicants left out`);   // only those displaced by the LGA cap / minimums
+  }
+  void ageBand;
+  // Not enough PWD: said plainly.
+  const few = balancedSelect(rk, data, { ...spec, minPwdShare: 0.9 });
+  assert.ok(few.notes.some((n) => /persons with disability \(wanted at least 54\)/.test(n)), few.notes.join(" | "));
+});

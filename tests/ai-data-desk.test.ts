@@ -110,3 +110,18 @@ test("the new-tab writer refuses existing names and only ever adds", async () =>
   assert.equal(tabs.get(a.tab)![1][0], "'=SUM(1)", "formulas are stored as text");
   assert.equal(snapshot(), before);
 });
+
+test("one balanced_sheet call builds the whole per-state selection; an empty AI reply ends clearly", async () => {
+  const { askDataDesk } = await import("../lib/services/aiDataDesk");
+  const before = snapshot();
+  script = ['{"tool":"balanced_sheet","args":{"title":"Focal 3x5","per_state":{"Kaduna":5,"Niger":5,"Nasarawa":5},"min_women_share":0.2,"min_pwd_share":0.1,"min_each_age_band_share":0.15,"spread_lga":true}}', '{"answer":"Done: 15 applicants."}'];
+  const r = await askDataDesk("5 each from Kaduna, Niger, Nasarawa, 20% women, 10% PWD", [], "admin@example.org");
+  assert.ok(r.ok); if (!r.ok) return;
+  assert.equal(r.data.outputs.length, 1); assert.match(r.data.outputs[0].tab ?? "", /^AI · Focal 3x5/);
+  const tab = tabs.get(r.data.outputs[0].tab!)!;
+  assert.ok(tab[0].includes("placed_by") && tab[0].includes("age_band"));
+  assert.equal(snapshot(), before, "existing tabs untouched");
+  script = ["", ""];   // model spends its whole budget and says nothing, twice
+  const e = await askDataDesk("anything", [], "admin@example.org");
+  assert.ok(e.ok); if (e.ok) assert.match(e.data.answer, /empty reply twice/);
+});
