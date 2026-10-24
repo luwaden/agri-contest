@@ -1,3 +1,4 @@
+import type { Level2Application, Level2Invite } from "@/types/level2";
 import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import type { Application, ApplicationStatus } from "@/types/application";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
@@ -58,6 +59,12 @@ export interface ApplicationRepository {
   getEmailCampaigns(): Promise<EmailCampaign[]>;
   getEmailLog(): Promise<EmailLogRow[]>;
   appendEmailLog(rows: EmailLogRow[]): Promise<void>;
+  // Level 2 (invited applicants; append-only).
+  getLevel2Invites(): Promise<Level2Invite[]>;
+  addLevel2Invites(rows: Level2Invite[]): Promise<void>;
+  getLevel2Applications(): Promise<Level2Application[]>;
+  /** Throws DUPLICATE_LEVEL2 if this Level 1 code already has a Level 2 application. */
+  createLevel2Application(a: Level2Application): Promise<void>;
   /** Cheap, read-only check used by /api/health?check=store. Never returns secrets. */
   diagnose(): Promise<StoreDiagnosis>;
   logEvent(event: AuditEvent): Promise<void>;

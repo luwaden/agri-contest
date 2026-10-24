@@ -103,6 +103,14 @@ async function contract(name: string, repo: ApplicationRepository) {
   assert.deepEqual(await repo.getEmailCampaigns(), [camp], `${name}: campaign round trip`);
   await repo.appendEmailLog([{ at: "2026-10-19T10:01:00Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA2", email: "k@example.com", status: "SENT", detail: "em_1" }, { at: "2026-10-19T10:01:01Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA3", email: "l@example.com", status: "FAILED", detail: "-TIMEOUT" }]);
   const lg = await repo.getEmailLog(); assert.equal(lg.length, 2); assert.equal(lg[1].detail, "-TIMEOUT", `${name}: log round trip (guarded text)`);
+  // Level 2 (append-only, one per code)
+  await repo.addLevel2Invites([{ level1Code: "AGRA-2026-AAAAA2", invitedAt: "2026-10-23T10:00:00Z", invitedBy: "a@example.org", note: "=Focal" }]);
+  assert.deepEqual(await repo.getLevel2Invites(), [{ level1Code: "AGRA-2026-AAAAA2", invitedAt: "2026-10-23T10:00:00Z", invitedBy: "a@example.org", note: "=Focal" }], `${name}: invite round trip`);
+  const { LEVEL2_COLUMNS } = await import("../lib/google-sheets/level2Schema");
+  const l2 = Object.fromEntries(LEVEL2_COLUMNS.map(([, k]) => [k, `v-${k}`])) as any; l2.level1Code = "AGRA-2026-AAAAA2"; l2.otherNeeds = "+Line one\nLine two, \"quoted\"";
+  await repo.createLevel2Application(l2);
+  await assert.rejects(() => repo.createLevel2Application(l2), /DUPLICATE_LEVEL2/, `${name}: one Level 2 per code`);
+  assert.deepEqual(await repo.getLevel2Applications(), [l2], `${name}: Level 2 round trip`);
 }
 
 test("repository contract: local JSON store", async () => { const { LocalRepository } = await import("../lib/repository/local"); await contract("local", new LocalRepository()); });

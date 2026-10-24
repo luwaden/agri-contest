@@ -11,7 +11,7 @@ const FULL_NAV = [
 ];
 const SHORT_NAV = [{ href: "/mentors", label: "Call for Experts" }];
 
-export function SiteHeader({ cta, canApply, full = true }: { cta: string; canApply: boolean; full?: boolean }) {
+export function SiteHeader({ cta, canApply, full = true, applyButton = true }: { cta: string; canApply: boolean; full?: boolean; applyButton?: boolean }) {
   const NAV = full ? FULL_NAV : SHORT_NAV;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -28,9 +28,9 @@ export function SiteHeader({ cta, canApply, full = true }: { cta: string; canApp
           {NAV.map((n) => <Link key={n.href} href={n.href} className="text-[15px] font-semibold text-ink-soft transition-colors hover:text-primary">{n.label}</Link>)}
         </nav>
         <div className="flex items-center gap-2">
-          <LinkButton href={canApply ? "/apply" : "/#apply"} className="!rounded-full !bg-sun !px-4 !py-2.5 text-sm !text-night hover:!bg-lime whitespace-nowrap sm:!px-5">
+          {applyButton && <LinkButton href={canApply ? "/apply" : "/#apply"} className="!rounded-full !bg-sun !px-4 !py-2.5 text-sm !text-night hover:!bg-lime whitespace-nowrap sm:!px-5">
             {canApply ? "Apply Now" : cta.startsWith("Applications Open") ? "Opening soon" : "Closed"}
-          </LinkButton>
+          </LinkButton>}
           <button type="button" className="rounded-md p-2.5 lg:hidden" aria-expanded={open} aria-controls="mobile-nav" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">{open ? <path d="M5 5l14 14M19 5L5 19" /> : <path d="M3 7h18M3 12h18M3 17h18" />}</svg>
           </button>

@@ -2,6 +2,7 @@ import type { Application } from "@/types/application";
 import { MENTOR_HEADERS } from "./mentorSchema";
 import { STAFF_HEADERS } from "./staffSchema";
 import { REVIEW_HEADERS } from "./reviewSchema";
+import { LEVEL2_HEADERS, LEVEL2_INVITE_HEADERS } from "./level2Schema";
 
 export const SHEETS = {
   applications: "Applications",
@@ -18,6 +19,8 @@ export const SHEETS = {
   reviews: "Panel Reviews",
   emailCampaigns: "Email Campaigns",
   emailLog: "Email Log",
+  level2: "Level 2 Applications",
+  level2Invites: "Level 2 Invites",
 } as const;
 
 type Kind = "s" | "n" | "b" | "l" | "j";
@@ -71,6 +74,8 @@ export const HEADERS = {
   [SHEETS.reviews]: REVIEW_HEADERS,
   [SHEETS.emailCampaigns]: ["campaign_id", "created_at", "created_by", "subject", "body", "audience", "recipient_ids_json"],
   [SHEETS.emailLog]: ["at", "campaign_id", "application_id", "email", "status", "detail"],
+  [SHEETS.level2]: LEVEL2_HEADERS,
+  [SHEETS.level2Invites]: LEVEL2_INVITE_HEADERS,
 } as const;
 
 const get = (obj: any, path: string) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);

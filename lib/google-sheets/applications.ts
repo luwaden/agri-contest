@@ -9,6 +9,8 @@ import { rowToStaff, staffToRow } from "./staffSchema";
 import { reviewToRow, rowToReview } from "./reviewSchema";
 import type { PanelReview } from "@/types/review";
 import type { EmailCampaign, EmailLogRow } from "@/types/email";
+import type { Level2Application, Level2Invite } from "@/types/level2";
+import { level2ToRow, rowToLevel2 } from "./level2Schema";
 import type { StaffAccount } from "@/types/staff";
 import { classifyError } from "@/lib/http";
 import type { StoreDiagnosis } from "@/lib/repository/types";
@@ -154,6 +156,23 @@ export class SheetsRepository implements ApplicationRepository {
     if (this.sheets.updateRows) await this.sheets.updateRows(SHEETS.reviews, writes);
     else for (const w of writes) await this.sheets.updateRow(SHEETS.reviews, w.rowNumber, w.row);
     return out;
+  }
+
+  // ── Level 2 (append-only) ──
+  async getLevel2Invites(): Promise<Level2Invite[]> {
+    return (await this.optionalRows(SHEETS.level2Invites)).filter((r) => r[0]).map((r) => ({ level1Code: r[0].trim().toUpperCase(), invitedAt: r[1] ?? "", invitedBy: unguardText(r[2] ?? ""), note: unguardText(r[3] ?? "") }));
+  }
+  async addLevel2Invites(rows: Level2Invite[]) {
+    if (!rows.length) return;
+    const out = rows.map((r) => [r.level1Code, r.invitedAt, guardText(r.invitedBy), guardText(r.note)]);
+    if (this.sheets.appendMany) await this.sheets.appendMany(SHEETS.level2Invites, out); else for (const r of out) await this.sheets.append(SHEETS.level2Invites, r);
+  }
+  async getLevel2Applications(): Promise<Level2Application[]> {
+    return (await this.optionalRows(SHEETS.level2)).map(rowToLevel2).filter((a): a is Level2Application => a !== null);
+  }
+  async createLevel2Application(a: Level2Application) {
+    if ((await this.getLevel2Applications()).some((x) => x.level1Code === a.level1Code)) throw new Error("DUPLICATE_LEVEL2");
+    await this.sheets.append(SHEETS.level2, level2ToRow(a));
   }
 
   // ── messages to applicants (append-only) ──

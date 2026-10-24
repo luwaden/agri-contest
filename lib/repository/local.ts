@@ -1,3 +1,4 @@
+import type { Level2Application, Level2Invite } from "@/types/level2";
 import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import "server-only";
 import { promises as fs } from "node:fs";
@@ -8,7 +9,7 @@ import type { MentorApplication, MentorStatus } from "@/types/mentor";
 import type { StaffAccount } from "@/types/staff";
 import type { PanelReview } from "@/types/review";
 
-interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[]; campaigns?: EmailCampaign[]; emailLog?: EmailLogRow[] }
+interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[]; campaigns?: EmailCampaign[]; emailLog?: EmailLogRow[]; level2?: Level2Application[]; level2Invites?: Level2Invite[] }
 const FILE = path.join(process.cwd(), ".data", "dev-store.json");
 
 let queue: Promise<unknown> = Promise.resolve();
@@ -102,4 +103,12 @@ export class LocalRepository implements ApplicationRepository {
   getEmailCampaigns = () => serial(async () => (await load()).campaigns ?? []);
   getEmailLog = () => serial(async () => (await load()).emailLog ?? []);
   appendEmailLog = (rows: EmailLogRow[]) => serial(async () => { const s = await load(); (s.emailLog ??= []).push(...rows); await save(s); });
+  getLevel2Invites = () => serial(async () => (await load()).level2Invites ?? []);
+  addLevel2Invites = (rows: Level2Invite[]) => serial(async () => { const s = await load(); (s.level2Invites ??= []).push(...rows); await save(s); });
+  getLevel2Applications = () => serial(async () => (await load()).level2 ?? []);
+  createLevel2Application = (a: Level2Application) => serial(async () => {
+    const s = await load(); s.level2 ??= [];
+    if (s.level2.some((x) => x.level1Code === a.level1Code)) throw new Error("DUPLICATE_LEVEL2");
+    s.level2.push(a); await save(s);
+  });
 }

@@ -2,7 +2,8 @@ import "server-only";
 import { after } from "next/server";
 import { getRepository } from "@/lib/repository";
 import { emailProvider, sendEmail, type EmailMessage } from "./send";
-import { applicantConfirmation } from "./templates";
+import { applicantConfirmation, teamMessage } from "./templates";
+import { PROGRAMME } from "@/config/programme";
 
 /**
  * Only APPLICANTS get an email (one confirmation each). Panel applications and team notices send nothing.
@@ -26,4 +27,13 @@ async function deliver(kind: string, ref: string, msg: EmailMessage) {
 export function emailApplicant(a: Parameters<typeof applicantConfirmation>[0]) {
   if (emailProvider() === "off") return;
   inBackground(() => deliver("applicant confirmation", a.applicationId, applicantConfirmation(a)));
+}
+
+/** Level 2: one short confirmation to the address given on the form. */
+export function emailLevel2Received(a: { level1Code: string; email: string; contactName: string; businessName: string }) {
+  if (emailProvider() === "off") return;
+  const first = a.contactName.split(" ")[0] || "applicant";
+  const msg = teamMessage({ to: a.email, subject: `Level 2 application received: ${a.level1Code}`, heading: "We have received your Level 2 application", ref: a.level1Code, key: `level2-${a.level1Code}`,
+    body: `Dear ${first},\n\nThank you. We have received the Level 2 application for ${a.businessName}.\n\nThe programme team will review it and contact you about the next step. Please keep your Level 1 application code for any communication.\n\nThe ${PROGRAMME.shortName} team` });
+  inBackground(() => deliver("level 2 confirmation", a.level1Code, msg));
 }

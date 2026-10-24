@@ -15,7 +15,7 @@ const root = () => (process.env.CLOUDINARY_ROOT_FOLDER || "programme").replace(/
 
 export const SESSION_PATTERN = /^[A-Za-z0-9_-]{12,40}$/;
 
-export type UploadScope = "applicant" | "mentor";
+export type UploadScope = "applicant" | "mentor" | "level2";
 export const APPLICANT_STAGES = [1, 2, 3] as const;
 
 export function uploadFolder(scope: UploadScope, id: string, stage?: number): string {
@@ -23,6 +23,10 @@ export function uploadFolder(scope: UploadScope, id: string, stage?: number): st
     if (!stage || !(APPLICANT_STAGES as readonly number[]).includes(stage)) throw new Error("Invalid stage");
     if (!SESSION_PATTERN.test(id)) throw new Error("Invalid upload session");
     return `${root()}/applicants/stage-${stage}/${id}`;
+  }
+  if (scope === "level2") {
+    if (!/^AGRA-\d{4}-[A-Z0-9]{6}$/.test(id)) throw new Error("Invalid Level 1 code");
+    return `${root()}/level-2/${id}`;
   }
   if (!/^MNTR-\d{4}-[A-Z0-9]{6}$/.test(id) && !SESSION_PATTERN.test(id)) throw new Error("Invalid mentor reference");
   return `${root()}/mentors/${id}`;

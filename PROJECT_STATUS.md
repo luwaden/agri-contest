@@ -1,291 +1,84 @@
-# PROJECT_STATUS.md: handover (updated 16 Oct 2026, 11:40 WAT; replaces the 13 Oct version)
+# PROJECT_STATUS.md: handover (updated 23 Oct 2026, 23:30 WAT; replaces the 13 Oct version)
 
-> **For the next Claude conversation:** the user's GitHub repository, on their Windows PC (`C:\Users\ayode\Downloads\agra-contest-current\agri-contest-12-01`), is the source of truth. The copy this document was written from is a cloud workspace that differs in at least one known place (see §6). **Read the relevant files before changing anything.** Since 9 Oct the user asks for **only the changed files** (as a small zip plus exact `git add` paths), never the whole project, and **never** a replacement for `config/programme.ts`: give line edits for that file instead.
+> **For the next Claude conversation:** the user's GitHub repo on their Windows PC (`C:\Users\ayode\Downloads\agra-contest-current\agri-contest-12-01`, GitHub `luwaden/agri-contest`, branch `main`) is the source of truth. The latest code from this chat is the cumulative zip **`agri-update-9.zip` (86 files, version `2026.10.23`)**. It contains every change since the 13 Oct `agri-contest-platform_5.zip`. Whether the user has applied it is **[UNKNOWN]**: ask. **Read files before changing them.** The user wants **changed files only** (a small zip plus exact `git add` paths), and **never** a replacement for `config/programme.ts` (give line edits). Keep replies short and plain; the user is not a developer by default. Follow the user's Prisma note: this project does **not** use Prisma.
 >
-> **Legend:**
-> - **[VERIFIED]** means tested by me (automated tests, a build, a browser run, or a command whose output I saw), or confirmed by output the user pasted.
-> - **[USER-REPORTED]** means the user said so, but I did not see it.
-> - **[ASSUMED]** means not verified.
-> - **[NOT BUILT]** means not implemented.
+> **Legend:** **[VERIFIED]** tested by me (tests, build, browser run, or output I saw) · **[USER-REPORTED]** · **[ASSUMED]** · **[NOT BUILT]**.
 
 ---
 
-## 1. Purpose, stack, architecture
-**Purpose.** The public website and staff tools for the **AGRA–SMEDAN Youth Agri-Innovation Contest**, delivered by Plus Incubation Hub Nigeria Limited. Young Nigerians (aged 18–35) apply online. Mentors, judges and reviewers apply to join the panel. Staff review everything in an admin area.
-- **Live URL:** https://agri-contest.vercel.app (Vercel). **On 13 Oct the user said they have moved to another hosting platform**; the new host and its URL are not known to me. Vercel still runs `2026.10.11` [VERIFIED from the user's preflight output].
-- **Applications are open and live data exists.** On 13 Oct the preflight read **6,238 applications, 15 panel applications, 196 drafts and 6 staff accounts in Admin Users**, all ✔ [VERIFIED from the user's pasted output].
-- **Dates** come from `config/programme.ts` and the env settings:
-  - application window: 8–16 Oct 2026 (WAT)
-  - grand finale: Thu 29 Oct 2026
-  - showcase: 8–10 Nov
+## 1. Purpose, stack, hosting
+- Website and staff tools for the **AGRA–SMEDAN Youth Agri-Innovation Contest** (delivered by Plus Incubation Hub Nigeria Ltd). Young Nigerians aged 18–35 applied (Level 1, **closed 16 Oct 2026 23:59 WAT**; about 6,238 applications). Grand finale Thu 29 Oct; showcase 8–10 Nov.
+- **Stack:** Next.js 15.5 (App Router), React 19, TypeScript, Tailwind, zod, bcryptjs, google-auth-library (Sheets REST), nodemailer 10.0.10 pinned (Gmail SMTP) or Resend, Cloudinary (uploads), optional Upstash Redis, optional AI (OpenAI or Claude). Tests: `node:test` via `tsx --conditions=react-server`.
+- **Data store:** ONE Google Sheet ("AGRA-SMEDAN Applications"). No SQL database.
+- **Hosting:** the user **deleted the Vercel project** (13 Oct) and runs the app **locally** (`npm run build && npm start`). The new host is **not chosen yet**. When it is: set every env var (§7), `NEXT_PUBLIC_SITE_URL` = the new URL, build `npm run build`, start `npm start`.
+- **Architecture:** thin `app/api/**` routes → `lib/services/**` → the repository interface `lib/repository/types.ts` (implementations: `lib/google-sheets/applications.ts` (Sheets REST or Apps Script) and `lib/repository/local.ts` (JSON file, development only)). Role checks: `lib/auth/permissions.ts` (server-side on every page and route).
 
-**Stack:**
-- Next.js **15.5** (App Router), React 19, TypeScript, Tailwind, zod
-- bcryptjs for password hashes
-- `google-auth-library` for the Sheets REST API
-- Upstash Redis via its REST API (optional)
-- Cloudinary for uploads (optional)
-- nodemailer **10.0.10, pinned** (Gmail SMTP), or the Resend REST API (optional)
-- Tests: `node:test` run through `tsx --conditions=react-server`
-- Hosting: **Vercel**, deployed by pushing to `main` on GitHub
-
-**Architecture:**
-- Thin API routes in `app/api/**` call services in `lib/services/**`.
-- Services use the repository interface in `lib/repository/types.ts`. Its implementations are:
-  - `lib/google-sheets/applications.ts`: Google Sheets, over either Sheets REST (`client.ts`) or an Apps Script web app (`appsScript.ts`)
-  - `lib/repository/local.ts`: a JSON file at `.data/dev-store.json`, for development only and **blocked in production**
-- `DATA_BACKEND` chooses the store. **Production uses `sheets`** [VERIFIED: the health output showed `dataStore: "sheets"`].
-- Redis (`lib/kv.ts`) holds rate limits, drafts, the duplicate-email index, password-reset/invite links and session revocation. If Redis is absent, everything falls back to memory and the sheet.
-- The AI assistant (`lib/ai`, `lib/services/assistantService.ts`) is **staff-only by default** (`NEXT_PUBLIC_ASSISTANT_PUBLIC`). It **never gets direct database access**: the server builds a scrubbed context for it.
-
-## 2. Folder structure (important files)
-```
-app/                    pages + api routes (apply, mentors, admin/*, judge, review, reset-password, api/*)
-components/             application/ (applicant form), mentors/MentorApplicationForm.tsx, admin/*, landing/*, ui/*
-config/programme.ts     ALL programme facts: name, contactEmail, dates, option lists, partners, IMPLEMENTER (logo)
-config/implementer.ts   NEW 11 Oct: Plus Incubation Hub website constant
-config/mentors.ts       panel roles/expertise/availability + page text
-config/knowledge.ts     assistant knowledge base
-lib/google-sheets/      schema.ts (tab names, HEADERS, compareHeaders), mentorSchema.ts, staffSchema.ts, client.ts, applications.ts
-lib/services/           applicationService, mentorService, staffService, draftService, systemCheck, assistantService …
-lib/auth/               session.ts, server.ts, users.ts, passwords.ts, permissions.ts (role table)
-lib/email/              send.ts (Gmail/Resend), templates.ts, notify.ts: NEW 10–11 Oct
-lib/validation/         application.ts, mentor.ts (zod)
-lib/version.ts          APP_VERSION (bump every release; shown by /api/health)
-scripts/                setup-sheets, preflight, make-user, check-system, check-live, check-google, email-test, print-headers …
-apps-script/Code.gs     generated by `npm run build:appsscript` (tests fail if it drifts from the schema)
-tests/                  core, platform, repository, email (*.test.ts), helpers/fakeGoogle.ts
-docs/                   SAFE_UPDATE, EMAIL, CHECK_EVERYTHING, DEPLOY_TO_VERCEL, ACCESS_AND_LOGIN, FIX_500_ON_VERCEL, UPSTASH, …
-```
-**npm scripts:**
-- `dev`, `build`, `typecheck`, `test`
-- `setup:sheets`, `preflight`, `print:headers`, `build:appsscript`
-- `check:google`, `check:system`, `check:live`
-- `make-user`, `hash-password`, `email:test`
-
-## 3. Data store ("database") and migrations
-**Store:** one Google Sheet, titled "AGRA-SMEDAN Applications" [VERIFIED]. There is no SQL database. Tab names and headers are in `lib/google-sheets/schema.ts`.
-
-**Data tabs:**
-
-| Tab | Columns | Notes |
-|---|---|---|
-| Applications | 74 | Defined by `APPLICATION_COLUMNS`. One row per application. ID like `AGRA-2026-K7QX4M`. Lists are stored joined with `"; "`, JSON as text, and formula-injection guarded with a leading `'`. |
-| Drafts | 5 | Used only when Redis is off. |
-| Application Events | 5 | `at, application_id, actor, action, detail`. Audit log: SUBMITTED, status changes, SYSTEM_CHECK, PASSWORD_*, STAFF_*, **EMAIL_FAILED**. |
-| Mentors | 27 | Panel applications. ID like `MNTR-2026-…`. Columns 26–27 (`first_name`, `last_name`) were added on 9 Oct. `full_name` is still written. |
-| Admin Users | 8 | `user_id, name, email, role, active, note, password_hash, updated_at`. bcrypt hashes only. |
-| Judges | 6 | Legacy and unused; assignments live in Panel Reviews. |
-| **Panel Reviews** | 20 | **New 11 Oct.** One row per (application, judge or reviewer): `review_id, application_id, panel_email, panel_name, panel_role, status, assigned_at, assigned_by, score_originality…score_market (5), weighted_total, overall_comment, criterion_comments_json, conflict_note, updated_at, submitted_at`. Status is one of ASSIGNED, IN_PROGRESS, SUBMITTED, CONFLICT or WITHDRAWN. **Column 20 `decision` (PASS or blank) added 16 Oct** for reviewer passes; it reaches the live sheet only when the user runs `npm run setup:sheets` [NOT YET RUN]. Defined in `lib/google-sheets/reviewSchema.ts`. **Created on the live sheet by setup:sheets on 13 Oct** [VERIFIED]. |
-| Configuration | 4 | Created but not used yet. |
-
-**Summary tabs:** State, Applicant, Business and Inclusion Metrics. These are formula tabs that `setup:sheets` rewrites.
-
-**Relationships:** by ID only. Events reference application or mentor IDs. There are no foreign keys.
-
-**Migrations are append-only:**
-- **Never reorder, rename or insert columns.** The app writes rows **by column position**.
-- `npm run setup:sheets` only appends missing header titles. It skips conflicts unless run with `--force`, and `--force` must **never** be used on the live sheet.
-- `npm run preflight` is a read-only check. It does three things:
-  - backs up every tab to `backups/<timestamp>/` (git-ignored, because it holds personal data)
-  - checks the headers of every tab
-  - round-trips every existing row through the current code
-
-**Pending migration (16 Oct):** append `decision` to Panel Reviews (preflight, then setup:sheets). **Previous migration (13 Oct):** created the **Panel Reviews** tab [VERIFIED: the user ran preflight (✔ SAFE TO DEPLOY, 6,238 rows round-tripped) and then setup:sheets]. Before that, on 9 Oct, Mentors gained `first_name` and `last_name`.
-
-## 4. Authentication, authorization, security
-**Who signs in:**
-- Applicants and panel applicants have **no accounts**. They get a reference number.
-- Staff sign in at `/admin/login`. There are four roles, defined in `lib/auth/permissions.ts`:
-
-| Role | Can do | Signs in to |
-|---|---|---|
-| ADMIN | everything | `/admin` |
-| COORDINATOR | everything except settings and user management; **can assign judges and reviewers** (`judges:manage`) | `/admin` |
-| JUDGE | only assigned applications and scoring; no lists, totals or exports | `/judge` |
-| REVIEWER | same limits as JUDGE | `/review` |
-
-**Sessions:**
-- The session is a signed, httpOnly cookie (`SESSION_SECRET`) lasting 8 hours.
-- Every request re-validates the user against the staff list, which is cached for 30 seconds. Deactivating someone or changing their role therefore takes effect almost immediately.
-- After a password reset, older sessions are revoked through the Redis key `pwchanged:`.
-
-**Staff accounts come from two places:**
-1. The **Admin Users tab** (the normal place).
-2. `ADMIN_USERS_JSON` (break-glass). This wins if an email appears in both. Hashes may be stored as `b64:<base64>`, which avoids `$` being mangled in `.env` files.
-
-**Managing staff:**
-- Add, invite, change role or deactivate at **Admin → Staff**.
-- Invite links last 48 hours and reset links 30 minutes. Both need Redis.
-- From the command line: `npm run make-user -- "email" "Name" ROLE "password"` writes to the sheet. Add `--env` to print a break-glass entry instead. Passwords need 10+ characters and must not contain the part of the email before the @.
-
-**Protections:**
-- A same-origin check on all state-changing API routes.
-- zod validation everywhere.
-- A honeypot field on the forms.
-- Rate limits (shared through Redis when it is on): login 5 per 15 minutes, submit 8 per 10 minutes, panel form 5 per 15 minutes, uploads, assistant, health.
-- A spreadsheet formula-injection guard on every write and on CSV export.
-- Secrets live only on the server and in env vars.
-
-**Brief rules to keep:**
-- No credentials in frontend code, and no plaintext passwords.
-- **The AI never gets direct database access.**
-- **No public 60/40 split or "focal state" quota wording.**
-- Don't invent programme facts.
-
-Details are in `docs/ACCESS_AND_LOGIN.md` and `docs/SECURITY_AUDIT.md`.
-
-## 5. Features and status
-
-| Feature | Status |
+## 2. Google Sheet tabs (append-only: never reorder or rename columns; the app writes by column position)
+| Tab | Notes |
 |---|---|
-| Public landing, apply, mentors, privacy and terms pages | [VERIFIED] builds and renders. Live [USER-REPORTED]. |
-| 3-stage applicant form, drafts and resume link, one application per email | [VERIFIED] by tests. Live with 402 rows [VERIFIED by preflight]. |
-| Panel form (mentor, judge, reviewer): first name and surname, **required LinkedIn** (linkedin.com only, `https://` added automatically), **one role** (radio), conflict-of-interest tick for judges and reviewers | [VERIFIED] by tests and a browser run on 9 Oct. Pushed to `main` [USER-REPORTED; I did not see the push]. |
-| Panel page left open in a browser from before the update | Shown "please refresh" (409 `FORM_UPDATED`) [VERIFIED by test] |
-| Admin dashboard, applications list and detail, status changes, CSV export, panel applications list and detail | Built in earlier sessions; tests pass. Not re-checked in a browser this session [ASSUMED working]. |
-| Staff management, invite and reset links | [VERIFIED] end-to-end on a local server (8 Oct). Live use not confirmed. |
-| System check: Admin → System check, `check:system`, `check:live`, `preflight` | [VERIFIED] locally. `preflight` and `setup:sheets` [VERIFIED] against the live sheet. |
-| **Applicant confirmation email** (Gmail SMTP from youthagriinnovate@gmail.com; Resend supported) | Code [VERIFIED] by tests against a fake Resend. Real Gmail sending: user said "now working" and that mail lands in **spam** [USER-REPORTED]. |
-| Who gets email | **Applicants only.** Panel applications and team notices send nothing [VERIFIED by test]. |
-| "Check your Spam folder" note on the success page, and an email with no web links | Built and tested (11 Oct, `spam-update.zip`). **Not confirmed as applied or deployed.** |
-| Contact email `youthagriinnovate@gmail.com`; footer "Implemented by" box links www.plusincubationhub.com | [VERIFIED] in my copy (browser). User's copy: they hit the missing `config/implementer.ts` error, then were told how to fix it [ASSUMED fixed]. |
-| PIH logo in the footer | User added `public/…/PIH.png` and the `IMPLEMENTER` logo line in **their** `config/programme.ts` [USER-REPORTED]. **My copy has no logo line.** |
-| AI assistant (staff-only) | Built earlier. **11 Oct:** new panel answers (how to score, changing a submitted score, others' scores, "the AI can't score for you") and admin answers (how to assign, where the results are). Ranking now gives a +2 bonus to entries for the asker's own audience. Judges and reviewers never get admin answers or applicant figures [VERIFIED by test]. `AI_PROVIDER` on the live site is unknown [ASSUMED off or quick answers only]. |
-| **Judging: assignments** (Admin → **Judging**, `/admin/judging`) | **Built 11 Oct.** Round toggle (`?round=reviewers` or `?round=judges`). Auto-assign takes a number per application, a status filter, and an optional single value chain or state; you **Preview** before you **Confirm**. It balances by current workload with a seeded tie-break. It never gives the same person an application twice, never gives anyone their own application (matched by email), and never gives an application to someone who declared a conflict on it. Re-running only fills gaps. Manual assign, **Withdraw** and **Reopen** are on the application detail page under "Panel reviews". Conflicts list shows a "Give to someone else" button. The page also shows progress by person and a Results table (rank, average of SUBMITTED sheets only, per-criterion averages, min–max, flags TIE / SPREAD ≥20 / WAITING / NEEDS_PANEL, CSV download). [VERIFIED] by tests and a local Playwright run with 64 demo applications and with 6,238 seeded applications. **Not yet verified on the live site.** |
-| **Judging: reviewer and judge portals** (`/review`, `/judge`, `/review/[id]`, `/judge/[id]`) | **Built 11 Oct.** The home page shows progress, status tabs (To score, In progress, Submitted, Conflicts) and filters (search, value chain, state, stage, rural/urban, sort); filters are kept in the URL. The score sheet puts the application on the left and the sheet on the right: 1–10 per criterion with band text, optional notes, a required overall comment (20+ characters), a no-conflict tick, a live weighted total, Save draft, and Submit, which locks the sheet. It also has "Declare a conflict", Prev/Next, and document links (`/api/admin/files` now lets panel members open files of applications assigned to them). Panel members never receive phone, WhatsApp, email, address, date of birth or disability details, or anyone else's scores (`panelView`, `stripForOwner`). Unassigned applications return 404. [VERIFIED] locally. |
-| **Screening pipeline** (Admin → **Screening**, `/admin/screening`; built 16 Oct, v2026.10.16) | Step 1: eligibility rules + automatic **pre-score** (same 5 criteria/weights, estimated in code from the answers; no LLM, no cost) → top 1,300 CSV (`lib/screening`, `config/screening.ts`). Step 2: batch of 500 from the top 1,300 with a fair spread (every state ≥1; zone and value chain ≥ half their shortlist share; women ≥30% and rural ≥20% from internal TARGETS when available) shared evenly between chosen reviewers, preview then confirm. Step 3: board per reviewer; tick → Move to a person or "share evenly"; passed/scored work never moves; old row kept WITHDRAWN. Reviewers press **Pass** (limit 15, server-enforced; `SCREENING_PASS_PER_REVIEWER`). Reviewers do **not** see the pre-score (independent judgment). Step 4: send passed to judges (existing score sheets), top 30 CSV. CSVs: top list, all with reasons, batch, passed, top 30 (`export:data`, logged as SCREENING_EXPORT). [VERIFIED] by 7 new tests and a local Playwright walk on 6,238 seeded applications (dev, local store). **Not run against the live sheet.** |
-| **Screening "Quick requests"** (top of Admin → Screening; 16 Oct) | Plain-language box. Lists: e.g. "best 1300, 60% focal, 40% other states, 20% women" → settings shown and editable → preview counts → CSV (`list=custom`, spec re-validated on the server, logged). Focal/other shares are exact; women/PWD/rural are minimums, optionally "in the first N" (`lib/screening/customList.ts`). Counts: "how many women in the batch/top 1300/passed". Actions: "move Reviewer 4's unfinished work to the others", "send the passed to judges, 3 each" → preview → **Confirm** (same checked API as the buttons). Works without AI; if `AI_PROVIDER` is set the AI only turns the sentence into settings and never receives applicant data [VERIFIED by test]. [VERIFIED] 5 tests + Playwright on 6,238 seeded applications. |
-| **AI data desk** (Admin → AI data desk, `/admin/ai-data`; ADMIN only, permission `ai:data`; 16 Oct, v2026.10.16-3) | User decision: AI gets full READ access but must never change data. Tools run on the server over all rows: `search` (≤50 rows/call to the AI), `count`/group_by, `get_application`, and `create_sheet`, the ONLY write: adds a NEW tab named "AI · <title> · <time>" (`lib/google-sheets/outputTabs.ts`; refuses existing names, add-only) + CSV download (kept 3 h). Contact details (phone, email, address, DOB, disability type) go to the AI only if `AI_FULL_DATA_ACCESS=true`; they can always be put INTO a new sheet. Logged: AI_DATA_QUERY, AI_SHEET_CREATED. Needs AI_PROVIDER + key. [VERIFIED] 4 tests with a scripted AI and a simulated Google sheet: existing tabs byte-identical, PII not sent unless switched on. **Not run with a real AI or the live sheet.** **Privacy: before turning AI_FULL_DATA_ACCESS on, confirm the privacy notice/partners allow sending applicant data to the AI provider (NDPA 2023).** |
-| **Messages** (Admin → Messages, `/admin/messages`; ADMIN only, permission `email:send`; 19 Oct, v2026.10.19) | Email a chosen group from the configured sender (GMAIL_USER or Resend EMAIL_FROM). Groups: passed by reviewers, with reviewers, with judges, top N by judges, top N by pre-score, a status, or pasted references/emails (submitted only, one per email). Fill-ins {first_name} {last_name} {full_name} {application_id} {business_name} {state}; text escaped; preview + "send a test to me". Sending runs in batches of 20 from the open page (pause/continue/cancel), max 2,000 per message, daily cap `EMAIL_DAILY_LIMIT` (450 Gmail), never twice to the same person (checked against the log), bad addresses not retried, other failures up to 3 attempts. NEW tabs **Email Campaigns** and **Email Log** (append-only; need `npm run setup:sheets`). [VERIFIED] 5 tests with a fake Resend + repository contract on all 3 transports + browser preview. **Not tested with real Gmail.** |
-| Messages to people who are not applicants (19 Oct, v2026.10.19-3) | Recipients can also be: any pasted email address (with optional name: "Name <email>" or "email, Name"), staff accounts (judges/reviewers/all, active only), or panel applications (by status). Mixed lists work; an applicant's own address gets the applicant version. Non-applicants get no reference box, a neutral footer, and empty {application_id}/{business_name} (preview warns). Stored as "ext:email|Name" in Email Campaigns; logged as application_id "EXTERNAL". Invalid addresses are listed and left out at preview. [VERIFIED] tests + browser preview. |
-| Self-service password reset by email | **[NOT BUILT]** |
-| Confirmation emails for the ~400 people who applied before emails existed | **[NOT BUILT]**. Offered as a batched one-off command. |
+| Applications | 74 columns, Level 1 applications |
+| Drafts, Application Events (audit log), Mentors (panel applications), Admin Users (staff), Judges (legacy), Configuration | unchanged |
+| Panel Reviews | 20 columns; **col 20 `decision` (PASS) added 16 Oct** |
+| **Email Campaigns**, **Email Log** | NEW 19 Oct (Messages) |
+| **Level 2 Applications**, **Level 2 Invites** | NEW 23 Oct (Level 2) |
+| "AI · …" tabs | created only by the AI data desk; safe to delete |
 
-## 6. Known issues, errors and investigations
-- **19 Oct: AI data desk showed "Working…" forever** [USER-REPORTED] on "180 people, 60 each from Kaduna/Niger/Nasarawa, 20% women, 10% PWD, age mix, LGA spread". Cause: the reply finished with an EMPTY answer (OpenAI reasoning models can spend the whole 1,500-token budget thinking), and the page treated "finished, no answer" as "still working". Fixed in 2026.10.19-2: budget 4,000, one retry, a clear message if still empty, 120 s AI timeout, page shows finished state. New deterministic `balanced_sheet` tool / `lib/screening/balanced.ts` (exact per-state counts, women/PWD/age-band minimums per state, LGA spread + 25% cap, otherwise by pre-score); also used by Screening → Quick requests (`list=balanced` CSV), which handles that exact sentence without AI in ~3 s on 6,238 seeded rows [VERIFIED].
-- **16 Oct: SHEET_QUOTA (ref V0PF16) on a Quick request** [USER-REPORTED]. Google allows ~60 reads/min per service account. Fixed in 2026.10.16-2: 3,000-row slices, tab sizes remembered 60 s, tab reads shared 20 s (`SHEETS_REUSE_SECONDS`), parsed applications shared 60 s (`ADMIN_CACHE_SECONDS`), caches on globalThis (shared under `next dev`), staff list from the 30 s cache, and a 429 now waits 15 s and retries up to 3 times. Every write clears the cached copy before and after. Measured with a fake Google client: Screening page 12 → 6 reads; quick requests right after: 0.
-- **NEW 16 Oct: 500 when assigning on /admin/judging** [USER-REPORTED, no server log seen]. Most likely a Sheets timeout (code NETWORK) on the user's connection. The assign screens now show `code` and `ref`; the matching `[api] ref=… code=…` line is in the server log. Write ranges now quote tab names (`'Panel Reviews'!A1`). If it recurs, get that log line.
-- **13 Oct timeout fix (v2026.10.14):** Applications and Panel Reviews are read in 1,000-row slices with gzip, one shared download, and a ≤10-minute stale fallback. Whether the user applied it is unknown.
-- **OPEN, top priority: "RangeError: Maximum call stack size exceeded at Set.has" on `/admin/judging`** [USER-REPORTED, 13 Oct, under `npm run dev` against the live sheet with 6,238 rows; page loads took up to 48 minutes].
-  - Not reproducible with the local JSON store, even at 6,238 rows.
-  - Likely cause: React 19.3 / Next 15.5 dev-mode async-debug tracking, overwhelmed by the page loading the whole sheet **4 times in parallel** (overview + results each called `loadApplications()`).
-  - **Fix shipped in the 13 Oct zip:** `judgingData = cache(async () => …)` in `reviewService.ts` loads applications, reviews and panelists once per request, sequentially. The page now catches load errors and shows "Judging could not load".
-  - **Not yet confirmed by the user.** Ask them to test in production mode (`npm run build && npm start`), not `npm run dev`.
-  - If it persists, likely next steps:
-    - stop loading full `Application` objects for judging (map rows to a slim summary in the repository)
-    - check the Sheets read path in `lib/google-sheets/client.ts` / `applications.ts`
-- **Because of that crash, the admin could not assign** and **judges saw nothing** [USER-REPORTED]. That is expected until assignments exist.
-- **"Invite and reset links need Redis (Upstash)…"** on the Staff page is an informational notice: Redis isn't configured in the user's environment. Accounts can be made with `npm run make-user` instead.
-- **Hosting move.** The user moved off Vercel (13 Oct). The new host needs every env var from §8, `NEXT_PUBLIC_SITE_URL` set to the new URL, build `npm run build`, start `npm start`, and the same GitHub repo/branch (`luwaden/agri-contest`, `main`). Then pause the Vercel project, so two deployments don't write to the same sheet.
-- Harmless build warnings: `jose` "Node.js API … not supported in the Edge Runtime" (from `lib/auth/session.ts` imported by the middleware), and git CRLF line-ending warnings on Windows. `npm audit` reports 10 vulnerabilities in dependencies; these haven't been reviewed.
+**Migration for agri-update-9:** `npm run preflight` (backup + check) → `npm run setup:sheets` (adds only missing tabs and columns; **never** `--force`). Whether the user has run it is **[UNKNOWN]**.
 
-- **Confirmation emails land in Spam** [USER-REPORTED].
-  - Cause: bulk identical mail from a new consumer Gmail account, with no domain of their own (no SPF/DKIM/DMARC under their control).
-  - Done: removed web links (especially `vercel.app` ones), simplified the footer, added the spam note on the success page.
-  - Real fix: their own domain plus Resend (needs DNS records; Pro plan, because the free plan stops at 100 a day). **Unresolved.**
-- **Gmail limit is about 500 emails a day.** At about 200 applications a day that's fine. A Sent-folder copy and incoming replies don't count. If the limit is hit, applications still succeed and the miss is logged as `EMAIL_FAILED` [VERIFIED by test].
-- **Module not found: `@/config/implementer`** [USER-REPORTED, 11 Oct]: the user didn't copy the new file. They were told to create `config/implementer.ts`.
-- **`.gitignore` went missing in the user's repo** on 9 Oct. `git add -A` was about to stage `node_modules`, `.env` and `backups/`. **Nothing was committed** [VERIFIED from their `git status`]. They were told to `git restore .gitignore`, add `backups/`, and stage files by name. Whether `.gitignore` is now correct is **[ASSUMED]**: check it with `git status` next time.
-- **Investigated earlier (resolved):**
-  - Vercel 500 errors: missing env vars on Vercel and a bad `GOOGLE_PRIVATE_KEY`. `/api/health?check=store` now explains the cause.
-  - 401 at login: the old `make-user` only printed an entry instead of saving it. It now writes to the sheet.
-  - CSS served as `text/plain` in development: stale `.next` folder. Fix: delete `.next` and restart.
-  - "Code not updating on Vercel": the code wasn't pushed, or the Root Directory/branch was wrong. See `docs/DEPLOY_TO_VERCEL.md`.
-- I can't fetch `/api/health` on the live site from my workspace (the site's robots.txt blocks `/api/`). That's why `check:live` exists for the user to run.
+## 3. What was built in this chat (all in agri-update-9.zip) [VERIFIED by tests and local browser runs; NOT run against the live sheet]
+1. **Sheets speed and quota (13 & 16 Oct).** The 129 s ETIMEDOUT and `SHEET_QUOTA` (60 reads/min) errors were fixed:
+   - gzip; 3,000-row slices (`lib/google-sheets/chunks.ts`); tab row counts remembered for 60 s.
+   - One shared copy of each tab for 20 s (`SHEETS_REUSE_SECONDS`) and of parsed applications for 60 s (`ADMIN_CACHE_SECONDS`), kept on `globalThis`. Every write clears the copy before and after.
+   - The staff list comes from its 30 s cache; a 429 waits 15 s and retries up to 3 times; a stale copy up to 10 min old is used if Google fails.
+   - Write ranges quote tab names; `updateRows` batches row updates into one request. The "Maximum call stack at Set.has" error was a dev-mode React issue: use `npm start`.
+2. **Screening pipeline** (Admin → Screening, `lib/screening/index.ts`, `config/screening.ts`):
+   - eligibility rules (age, Nigerian, declaration, Nigerian state, minimum words, duplicates);
+   - an automatic **pre-score** from the answers on the judges' 5 criteria (code, not AI; guidance only);
+   - top 1,300 CSV → batch of 500 with a fair spread → shared between 10 reviewers;
+   - reviewers **Pass** up to 15 (`SCREENING_PASS_PER_REVIEWER`) and do NOT see the pre-score;
+   - an easy **Move** board (tick → person or "share evenly"; passed/scored work never moves);
+   - send passed applications to judges → judges score → top 30 CSV.
+3. **Quick requests** (top of Screening; `lib/screening/customList.ts`, `balanced.ts`, `lib/services/screeningAssistant.ts`). Plain-English, works without AI:
+   - lists with exact focal/other shares and women/PWD/rural minimums, optionally "in the first N", with editable settings and a CSV;
+   - **balanced per-state selection** (e.g. "180 people, 60 each from Kaduna, Niger, Nasarawa, 20% women, 10% PWD, mixed ages, LGA spread", ~3 s);
+   - counts ("how many women in the batch"); proposed moves and "send to judges", which run only on **Confirm**.
+4. **AI data desk** (Admin → AI data desk, ADMIN only, `lib/services/aiDataDesk.ts`):
+   - the AI READS all data via server tools: search, count, get_application, `balanced_sheet`;
+   - it can WRITE only **new "AI · …" tabs** plus a CSV (`lib/google-sheets/outputTabs.ts`); existing tabs are never changed (tested byte-for-byte);
+   - contact details reach the AI only if `AI_FULL_DATA_ACCESS=true` (check the privacy notice and NDPA 2023 first);
+   - an empty AI reply now gives a clear message (cause: reasoning models using up the reply budget); settings `OPENAI_REASONING_EFFORT` (recommend `low`) and `AI_MAX_OUTPUT_TOKENS` (e.g. 8000).
+5. **Messages** (Admin → Messages, ADMIN only, `lib/services/emailCampaignService.ts`). Email from the configured sender (`GMAIL_USER` = youthagriinnovate@gmail.com, or Resend):
+   - groups: passed, batch, judges, top N, a status, staff accounts, panel applications, or **any pasted email addresses** with names, mixed with applicant codes;
+   - fill-ins `{first_name}` etc.; preview, then test to yourself, then batches of 20 from the open page (pause, continue, cancel);
+   - at most 2,000 per message; daily cap `EMAIL_DAILY_LIMIT` (450 for Gmail); never twice to the same person; all logged.
+6. **Level 2 application** (hidden page **`/level-2`**; Admin → Level 2; `lib/services/level2Service.ts`, `config/level2.ts`, `lib/validation/level2.ts`, `lib/google-sheets/level2Schema.ts`):
+   - access needs a Level 1 code + the matching Level 1 email + the code on the **invite list** (admin pastes codes); then a signed 3 h pass;
+   - answers known from Level 1 are pre-filled; **one submission per code**; repeated questions removed (Name = contact person; State once; rural/urban once);
+   - follow-up questions only when needed; ≥1 supporting document; CAC upload if CAC = YES; uploads go to `programme/level-2/<code>`;
+   - optional `LEVEL2_CLOSE_DATE`; confirmation email on submit. More questions are "still to come": append them at the END of `LEVEL2_COLUMNS`.
 
-## 7. Decisions, and approaches rejected
-- **Google Sheets stays the data store** while applications are open. A SQL database was deferred; the repository interface makes a later swap possible.
-- **Append-only sheet columns**, plus preflight before every change that touches the data.
-- **Changed files only** in each update. The user hand-edits `config/programme.ts`, so give line edits for it, never the whole file.
-- **Email sending:**
-  - Gmail SMTP for now. Resend was **rejected for now**: it needs their own domain, and its free plan stops at 100 a day.
-  - Emails are sent after the response, using Next's `after()`, so they never block or fail a submission.
-  - Only failures are logged to the sheet, to save writes.
-- **Applicant-only email.** Panel confirmations and team notices were **removed at the user's request** (11 Oct).
-- **No copy or BCC to youthagriinnovate@gmail.com**, so the daily limit is kept for applicants. The Sent folder already holds a copy.
-- **Contact email is youthagriinnovate@gmail.com.** plusincubationhub@gmail.com is no longer used; PIH appears by its website.
-- **nodemailer is pinned at 10.0.10.** Versions up to 10.0.5 have advisories. 10.1.0 was rejected as too new (released 10 Oct).
-- **Redis is optional.** Drafts in Redis fall back to the Drafts tab. The duplicate-email index seeds itself once from the sheet.
-- **The AI assistant is staff-only.** Public access was rejected by the user.
-- **One panel role per person**, per the user (9 Oct).
-- **Judging data model:** one Panel Reviews row = the assignment AND that person's score sheet (auditable). Scores **never** change application status automatically; a person does that. The average uses only SUBMITTED sheets, and a missing score is never treated as zero. Ties use the framework order originality → scalability → feasibility, then the moderation panel. The 20-point spread threshold is a working setting, not a programme rule. How many people per application is the admin's choice; the framework fixes no number. Panel members see the applicant name and business (needed to spot conflicts) but no contact details.
-- Judging writes use `appendMany` (one Sheets request per 500 rows) to respect the write quota.
+## 4. Roles
+ADMIN: everything (incl. Messages `email:send`, AI data desk `ai:data`). COORDINATOR: everything except staff, settings, Messages and the AI desk. JUDGE / REVIEWER: only their assigned work. Applicants and panel applicants have no accounts.
 
-## 8. Environment variables (names only)
-- **Required in production:**
-  - `DATA_BACKEND` (`sheets`), `GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`
-  - `SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`, `TRUST_PROXY`
-- **Window and dates:** `APPLICATION_OPEN_DATE`, `APPLICATION_CLOSE_DATE`, `FINALE_DATE_LABEL` (optional override)
-- **Staff:** `ADMIN_USERS_JSON` (optional break-glass), `ADMIN_CACHE_SECONDS`
-- **Redis:** `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` / `KV_REST_API_TOKEN`)
-- **Email:**
-  - Gmail: `GMAIL_USER`, `GMAIL_APP_PASSWORD`
-  - Resend: `RESEND_API_KEY`, `EMAIL_FROM`
-  - `EMAIL_REPLY_TO` (optional)
-  - (`TEAM_NOTIFY_EMAIL` was removed; delete it if set)
-- **Uploads:** `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_DELIVERY`, `CLOUDINARY_ROOT_FOLDER`, `UPLOAD_MAX_MB`
-- **AI:** `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_ALLOW_TEXT_EXCERPTS`, `NEXT_PUBLIC_ASSISTANT_PUBLIC`
-- **Apps Script (alternative transport or optional mirror):** `APPS_SCRIPT_URL`, `APPS_SCRIPT_SECRET`, `GOOGLE_SCRIPT_URL`, `GOOGLE_SCRIPT_SECRET`
-- **Other:** `HEALTH_CHECK_TOKEN`, `CORS_ALLOWED_ORIGINS`, `NEXT_PUBLIC_DEMO_MODE`, `CHECK_PASSWORD` (used only by the check:live script)
+## 5. Open issues and decisions waiting for the user
+- **Not yet confirmed by the user:** that agri-update-9 is applied, `setup:sheets` has been run, and it works on the live sheet. The 16 Oct **500 error when assigning** never got a server log; screens now show `code` + `ref`, so ask for the `[api] ref=… code=…` line if it recurs.
+- **Hosting:** new host not chosen.
+- **Database:** I recommended moving to **PostgreSQL** (Neon or Supabase) with the Sheet as a mirror, or as cheaper interim steps (read only needed columns; remember row numbers). The user has **not chosen**. [NOT BUILT]
+- **Level 2:** invite-only is my default; the user may want "any Level 1 applicant with the link". Invites cannot be removed in the UI.
+- **Email:** Gmail mail lands in Spam [USER-REPORTED]; the real fix is their own domain + Resend. About 500/day Gmail limit.
+- Possible later features: Redis in production, self-service password reset, moderation workflow, Level 2 review/scoring.
 
-Which of these are actually set on Vercel is **[ASSUMED]**, except the Google settings (the store works) and the Gmail settings (email works, per the user).
+## 6. Rules to keep
+No credentials in frontend code; no plaintext passwords. The AI never writes to existing data. No public 60/40 or "focal state" wording (admin-only screens are fine). Don't invent programme facts. Append-only sheet columns; preflight before any data change. `.gitignore` must exclude `.env`, `node_modules`, `backups/`; stage files by name.
 
-## 9. Testing
-- **Automated:** `npm test` gives **77 passed, 0 failed** [VERIFIED in my copy and in the user's pasted output on 13 Oct]. `tests/judging.test.ts` covers assignment balance and gap-filling, conflicts, self-exclusion, separate pools, score-sheet validation and totals, results and ties, privacy of `panelView`, the review row round trip, and assistant routing. The repository contract now includes reviews for all 3 transports. It covers:
-  - validation for both forms
-  - repository contract (local, fake Sheets, Apps Script)
-  - header migration
-  - staff and auth helpers
-  - Code.gs drift
-  - emails: applicant send, failure path, no panel email, HTML escaping, website text, no answers repeated
-- **Other checks** [VERIFIED]: `tsc --noEmit` is clean and `next build` succeeds.
-- **Browser runs** (Playwright, local) [VERIFIED]:
-  - the panel form submits and saves first name, last name, role and LinkedIn
-  - the footer links
-  - the confirmation email renders at phone width
-- **Against live data:** preflight passed on 402 applications and 2 mentors; setup:sheets added 2 columns [VERIFIED from pasted output].
-- **Still required:**
-  - After each deploy, run `npm run check:live -- https://agri-contest.vercel.app --email <admin>` and confirm the version.
-  - Submit one real application from a phone, confirm the email arrives (and where), then delete the test row.
-  - Confirm on the live site:
-    - the panel form
-    - the spam note
-    - the footer link
-  - Browser-test the admin dashboard and export again on the live site.
-  - Test Gmail delivery to Yahoo and Outlook addresses.
-- **Tests that failed and were fixed** this session: none remain failing. Earlier failures were test-setup problems in `email.test.ts` (top-level await, a missing declaration field, an over-broad "address" assertion).
+## 7. Environment variables (names only)
+`DATA_BACKEND`, `GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`, `TRUST_PROXY`, `APPLICATION_OPEN_DATE`, `APPLICATION_CLOSE_DATE`, **`LEVEL2_CLOSE_DATE`**, `ADMIN_USERS_JSON`, `ADMIN_CACHE_SECONDS`, **`SHEETS_REUSE_SECONDS`**, **`SHEETS_TIMEOUT_SECONDS`**, `UPSTASH_REDIS_REST_URL`/`_TOKEN`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, **`EMAIL_DAILY_LIMIT`**, `CLOUDINARY_*`, `UPLOAD_MAX_MB`, `AI_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, **`OPENAI_REASONING_EFFORT`**, **`AI_MAX_OUTPUT_TOKENS`**, **`AI_FULL_DATA_ACCESS`**, `AI_ALLOW_TEXT_EXCERPTS`, **`SCREENING_PASS_PER_REVIEWER`**, `APPS_SCRIPT_URL`/`_SECRET`, `HEALTH_CHECK_TOKEN`, `CORS_ALLOWED_ORIGINS`, `NEXT_PUBLIC_DEMO_MODE`. (Bold = added in this chat; all documented in `.env.example`.)
 
-## 10. Deployment and risks
-- **Deploy:**
-  1. The user copies the changed files into their local repo.
-  2. `git add <named paths>` (**never** `git add -A` unless `.gitignore` is verified).
-  3. `git commit`, then `git push` to `main`.
-  4. Vercel builds automatically. Env changes need **Redeploy**.
-  5. Roll back with Deployments → previous → Promote to Production.
-- **Risks:**
-  - Reordering sheet columns by hand would put new data in the wrong columns. Always run `npm run preflight` first.
-  - Committing `.env` or `backups/` (personal data, keys).
-  - The Gmail daily limit and spam placement.
-  - A single Google Sheet's quota (about 60 reads a minute per user). Redis reduces this; whether Redis is on in production is [ASSUMED].
-  - My copy and the user's repo drift apart, for example in `config/programme.ts` (logo line) and possibly other local edits.
-  - The application window closes on **16 Oct 2026 at 23:59 WAT**. After that, submissions return 403 by design.
-- **Live version:** `lib/version.ts` in my copy is **2026.10.13** (judging crash fix). The user pushed **2026.10.11** to GitHub `main` (commit `ca771d4`) and has **not yet pushed the 13 Oct fix**, as far as I know. Their local version string may also read 2026.10.13 from another chat's edits (they have an email feature I didn't build in this chat). The live version is unknown. Check `/api/health` or run `check:live`.
+## 8. Testing
+`npm test` → **111 passed, 0 failed** [VERIFIED 23 Oct]; `tsc --noEmit` clean; `next build` succeeds. Test files: core, platform, repository (contract on local + fake Sheets + Apps Script, incl. reviews, email tabs, Level 2), email, judging, sheets-read, screening, screening-assistant, ai-data-desk, ai-provider, messages, level2. Test data generator: `tests/helpers/varied.ts`. Browser runs used Playwright locally on 6,238 seeded test applications (never real data).
 
-## 11. Exact next task
-**16 Oct (new):** apply the screening zip (changed files only) → `npm test` → `npm run preflight` → `npm run setup:sheets` (adds only the `decision` column) → `npm run build && npm start` → Admin → Screening: check step 1 counts, download the top list and read it before creating the batch. Then deploy to the new host (not known yet). Ask for the server log line if any 500 appears.
-
-Older list (13 Oct):
-1. **Get the judging crash fix live.**
-   - The user unzips the 13 Oct `agri-contest-platform.zip` over their repo and restores `.env`. Better: copy only `lib/services/reviewService.ts` and `app/admin/judging/page.tsx`, so local edits aren't overwritten.
-   - They run `npm test`, then `npm run build && npm start`, and open `/admin/judging` signed in as admin.
-   - Then they push.
-   - If the error persists in production mode, debug the Sheets read path (§6).
-2. **Confirm where the site is hosted now.** Get the new URL and confirm its env vars. Run `npm run check:live -- <new-url> --email <admin>`, then pause Vercel.
-3. **Do a first real assignment**, small: Judging → Screening, 1 per application, one state → Preview → Confirm. Then sign in as a reviewer in a private window, score one, and check Results. Withdraw the test if needed.
-4. **Turn on Upstash Redis** in production. It's needed for invite and reset links, shared rate limits and the duplicate-email index at this volume.
-5. **Carried over from 11 Oct:**
-   - (a) a batched confirmation-email sender for earlier applicants
-   - (b) email on their own domain (spam)
-   - (c) confirm the spam-note and implementer updates are live
-6. **Possible next features** (only if the user asks): a moderation role and workflow, bulk status changes from Results, written-feedback export, Tier-1 automatic screening flags.
+## 9. Exact next steps
+1. Ask whether `agri-update-9.zip` is applied. If not: unzip it over the repo → `npm test` → `npm run preflight` → `npm run setup:sheets` → `npm run build && npm start`.
+2. Check with real data: Screening step 1 counts and the top-1,300 CSV; Quick requests for the 180 focal list; Messages test-to-self; Level 2 invite → form → submission.
+3. Commit with named paths, push, and choose a host (then `check:live`).
+4. Decide: PostgreSQL move vs Sheets quick wins; Level 2 access rule; email domain.
