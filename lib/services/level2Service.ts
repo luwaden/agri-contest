@@ -22,6 +22,8 @@ import type { ServiceResult } from "./applicationService";
  * The page is not linked anywhere, but that is not the protection: the invite list and the code+email check are.
  */
 const fail = (status: number, message: string, extra: Record<string, unknown> = {}) => ({ ok: false as const, status, body: { message, ...extra } });
+export const cleanCode = (s: unknown) => (typeof s === "string" ? s : "").normalize("NFKC").toUpperCase().replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-").replace(/[^A-Z0-9-]/g, "");
+export const cleanEmail = (s: unknown) => (typeof s === "string" ? s : "").normalize("NFKC").replace(/[\s\u200B-\u200D\uFEFF\u00A0]/g, "").replace(/^mailto:/i, "").toLowerCase();
 const norm = (s: unknown) => (typeof s === "string" ? s.trim() : "");
 const closed = () => { const c = LEVEL2.closeDate(); return !!c && Date.now() > new Date(c).getTime(); };
 const NOT_FOUND = "We could not find a Level 1 application with that code and email address. Check both (the code looks like AGRA-2026-K7QX4M) and try again.";
@@ -52,10 +54,12 @@ function prefill(a: Application): Partial<Record<keyof Level2Form, string>> {
 
 export async function startLevel2(input: { code?: unknown; email?: unknown }): Promise<ServiceResult<{ token: string; code: string; prefill: Record<string, string> }>> {
   if (closed()) return fail(403, "Level 2 applications are closed.");
-  const code = norm(input.code).toUpperCase(), email = norm(input.email).toLowerCase();
-  if (!REFERENCE_PATTERN.test(code) || !email.includes("@")) return fail(422, NOT_FOUND);
+  // Codes/emails pasted from email or WhatsApp often carry long dashes, spaces or invisible characters.
+  const code = cleanCode(input.code), email = cleanEmail(input.email);
+  if (!REFERENCE_PATTERN.test(code) || !email.includes("@")) { console.warn(`[level2] refused: code format "${code}"`); return fail(422, NOT_FOUND); }
   const a = await findApplication(code);
-  if (!a || a.applicant.email.trim().toLowerCase() !== email) return fail(404, NOT_FOUND);
+  if (!a) { console.warn(`[level2] refused: ${code} not found among submitted Level 1 applications`); return fail(404, NOT_FOUND); }
+  if (cleanEmail(a.applicant.email) !== email) { console.warn(`[level2] refused: ${code} email does not match the Level 1 email`); return fail(404, NOT_FOUND); }
   if (!(await isAllowed(code))) return fail(403, `This Level 1 application has not been invited to Level 2. If you believe this is a mistake, write to ${PROGRAMME.contactEmail} quoting your code.`);
   const done = (await getRepository().getLevel2Applications()).find((x) => x.level1Code === code);
   if (done) return fail(409, `A Level 2 application for ${code} was already received on ${new Date(done.submittedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "long" })}. Only one is allowed. Contact ${PROGRAMME.contactEmail} if something must change.`);

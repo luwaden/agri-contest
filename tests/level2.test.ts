@@ -108,3 +108,12 @@ test("LEVEL2_OPEN_TO_ALL lets any Level 1 applicant in (code + email still requi
     assert.equal((await S.startLevel2({ code: a.applicationId, email: "x@y.org" })).status, 404);
   } finally { delete process.env.LEVEL2_OPEN_TO_ALL; }
 });
+
+test("codes and emails pasted with long dashes, spaces or invisible characters still work", async () => {
+  const S = await import("../lib/services/level2Service");
+  const a = apps[8]; process.env.LEVEL2_OPEN_TO_ALL = "true";
+  try {
+    const messy = ` ${a.applicationId.replace(/-/g, "\u2013").replace("2026", "20 26")}\u200B `;
+    assert.ok((await S.startLevel2({ code: messy, email: `\u00A0${a.applicant.email.toUpperCase()}\u200B` })).ok);
+  } finally { delete process.env.LEVEL2_OPEN_TO_ALL; }
+});
