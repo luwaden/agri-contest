@@ -117,3 +117,56 @@ test("codes and emails pasted with long dashes, spaces or invisible characters s
     assert.ok((await S.startLevel2({ code: messy, email: `\u00A0${a.applicant.email.toUpperCase()}\u200B` })).ok);
   } finally { delete process.env.LEVEL2_OPEN_TO_ALL; }
 });
+
+test("uploads work without Cloudinary: files are kept on this server, only in the applicant's own folder", async () => {
+  delete process.env.CLOUDINARY_CLOUD_NAME; delete process.env.UPLOAD_STORAGE;
+  const U = await import("../lib/services/uploadService");
+  const S = await import("../lib/services/level2Service");
+  const { readLocal } = await import("../lib/files/localStore");
+  assert.equal(U.level2Storage(), "local");
+  const pdf = new TextEncoder().encode("%PDF-1.4\n% a small test proposal\n%%EOF");
+  const code = apps[1].applicationId, other = apps[0].applicationId;
+
+  const up = await U.storeUpload({ buffer: pdf, filename: "proposal.pdf", scope: "level2", ownerId: code, kind: "L2_SUPPORTING" });
+  assert.ok(up.ok); const ref = (up as any).data.url as string;
+  assert.match(ref, new RegExp(`^stored:level-2/${code}/l2-supporting-[a-z0-9-]+\\.pdf$`));
+  assert.deepEqual(new Uint8Array((await readLocal(ref))!), pdf, "the file is on disk");
+  const fake = await U.storeUpload({ buffer: new TextEncoder().encode("MZ this is not a pdf at all"), filename: "cv.pdf", scope: "level2", ownerId: code, kind: "L2_SUPPORTING" });
+  assert.equal(fake.status, 422, "a renamed file is refused");
+  assert.equal((await U.storeUpload({ buffer: pdf, filename: "a.pdf", scope: "level2", ownerId: "../../etc", kind: "L2_SUPPORTING" })).status, 400);
+  assert.equal(await readLocal("stored:level-2/../../../etc/passwd"), null, "no way out of the store folder");
+
+  assert.equal(validateLevel2(good({ doc1: ref })).ok, true, "an uploaded file counts as the document");
+  assert.equal(validateLevel2(good({ doc1: "stored:../secret.pdf" })).ok, false);
+
+  const st = await S.startLevel2({ code, email: apps[1].applicant.email }); assert.ok(st.ok);
+  const token = (st as any).data.token;
+  const theirs = ref.replace(code, other);
+  const stolen = await S.submitLevel2(token, good({ doc1: theirs }));
+  assert.equal(stolen.status, 422, "cannot point at another applicant's file"); assert.ok((stolen as any).body.errors.doc1);
+  assert.equal((await S.submitLevel2(token, good({ doc1: ref, cacCertificate: ref }))).status, 201);
+
+  process.env.NEXT_PUBLIC_SITE_URL = "https://contest.example.org";
+  try { assert.ok((await S.level2Csv()).csv.includes(`https://contest.example.org/api/admin/files?url=${encodeURIComponent(ref)}`), "CSV links open through the staff file viewer"); }
+  finally { delete process.env.NEXT_PUBLIC_SITE_URL; }
+});
+
+test("detail page: each document labelled; uploads open through the staff viewer, pasted links as they are", async () => {
+  const S = await import("../lib/services/level2Service");
+  const code = apps[1].applicationId;
+  const s = await S.level2Submission(code.toLowerCase());
+  assert.ok(s); assert.equal(s!.level1Code, code);
+  assert.equal(await S.level2Submission("AGRA-2026-NOPE22"), null);
+  assert.equal(await S.level2Submission("../etc"), null);
+
+  const docs = S.level2Documents({ ...s!, doc1: "stored:level-2/" + code + "/l2-supporting-abc.pdf", doc2: "https://drive.google.com/file/d/xyz/view",
+    doc3: "", smedanCertificate: "https://res.cloudinary.com/demo/raw/authenticated/s--x--/v1/programme/level-2/smedan.pdf", cacCertificate: "", hasCac: "YES", bankProof: "javascript:alert(1)" });
+  const by = Object.fromEntries(docs.map((d) => [d.field, d]));
+  assert.deepEqual(docs.map((d) => d.label), ["Business proposal, pitch deck or EOP", "Other supporting document", "Other supporting document", "CAC certificate", "SMEDAN certificate", "Bank account proof"]);
+  assert.equal(by.doc1.status, "file"); assert.equal(by.doc1.href, `/api/admin/files?url=${encodeURIComponent(`stored:level-2/${code}/l2-supporting-abc.pdf`)}&for=${code}`);
+  assert.equal(by.smedanCertificate.status, "file"); assert.match(by.smedanCertificate.href, /^\/api\/admin\/files\?url=https%3A%2F%2Fres\.cloudinary\.com/);
+  assert.deepEqual([by.doc2.status, by.doc2.href], ["link", "https://drive.google.com/file/d/xyz/view"]); assert.match(by.doc2.source, /drive\.google\.com/);
+  assert.equal(by.doc3.status, "missing");
+  assert.equal(by.cacCertificate.status, "missing"); assert.match(by.cacCertificate.note, /Required/);
+  assert.deepEqual([by.bankProof.status, by.bankProof.href], ["missing", ""], "anything that is not a file or an https link is never made clickable");
+});

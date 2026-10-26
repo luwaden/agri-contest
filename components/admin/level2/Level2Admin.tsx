@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -58,8 +59,8 @@ export function Level2Admin({ data, link, mayInvite, mayExport }: { data: Overvi
           {mayExport && data.submitted > 0 && <a href="/api/admin/level-2" className="rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-primary hover:text-white">Download all answers (CSV)</a>}</div>
         {data.submissions.length === 0 ? <p className="mt-2 text-sm text-ink-muted">Nothing yet.</p> : (
           <div className="mt-3 overflow-x-auto rounded-md border border-paper-line">
-            <table className="w-full min-w-[640px] text-sm"><thead className="bg-paper-warm text-left text-xs text-ink-muted"><tr><th className="px-3 py-2">Level 1 code</th><th className="px-3 py-2">Contact</th><th className="px-3 py-2">Business</th><th className="px-3 py-2">State / LGA</th><th className="px-3 py-2">Crop</th><th className="px-3 py-2">Received</th></tr></thead>
-              <tbody className="divide-y divide-paper-line">{data.submissions.map((s) => <tr key={s.code}><td className="px-3 py-1.5 font-mono text-xs">{s.code}</td><td className="px-3 py-1.5">{s.contactName}</td><td className="px-3 py-1.5">{s.businessName}</td><td className="px-3 py-1.5">{s.state} · {s.lga}</td><td className="px-3 py-1.5">{s.cropType}</td><td className="px-3 py-1.5 whitespace-nowrap">{when(s.submittedAt)}</td></tr>)}</tbody></table>
+            <table className="w-full min-w-[640px] text-sm"><thead className="bg-paper-warm text-left text-xs text-ink-muted"><tr><th className="px-3 py-2">Level 1 code</th><th className="px-3 py-2">Contact</th><th className="px-3 py-2">Business</th><th className="px-3 py-2">State / LGA</th><th className="px-3 py-2">Crop</th><th className="px-3 py-2">Received</th><th className="px-3 py-2"><span className="sr-only">Details</span></th></tr></thead>
+              <tbody className="divide-y divide-paper-line">{data.submissions.map((s) => <tr key={s.code} className="hover:bg-paper-warm/60"><td className="px-3 py-1.5 font-mono text-xs"><Link href={`/admin/level-2/${s.code}`} className="text-primary hover:underline">{s.code}</Link></td><td className="px-3 py-1.5">{s.contactName}</td><td className="px-3 py-1.5">{s.businessName}</td><td className="px-3 py-1.5">{s.state} · {s.lga}</td><td className="px-3 py-1.5">{s.cropType}</td><td className="px-3 py-1.5 whitespace-nowrap">{when(s.submittedAt)}</td><td className="px-3 py-1.5 text-right"><Link href={`/admin/level-2/${s.code}`} className="font-semibold text-primary hover:underline">View<span className="sr-only"> {s.businessName}</span></Link></td></tr>)}</tbody></table>
           </div>)}
         <p className="mt-2 text-xs text-ink-muted">Every answer is also in the “Level 2 Applications” tab of the Google Sheet.</p>
       </section>

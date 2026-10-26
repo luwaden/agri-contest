@@ -1,7 +1,7 @@
 import "server-only";
 import { getRepository } from "@/lib/repository";
 import { loadApplications } from "@/lib/data";
-import { validateLevel2, type Level2Form } from "@/lib/validation/level2";
+import { L2_DOC_FIELDS, STORED_L2_FILE, validateLevel2, type Level2Form } from "@/lib/validation/level2";
 import { issueLevel2Token, readLevel2Token } from "@/lib/level2/token";
 import { emailLevel2Received } from "@/lib/email/notify";
 import { LEVEL2, L2_CROPS } from "@/config/level2";
@@ -76,6 +76,8 @@ export async function submitLevel2(token: unknown, values: Record<string, unknow
   if (!(await isAllowed(pass.code))) return fail(403, "This Level 1 application is not invited to Level 2.");
   const r = validateLevel2(values);
   if (!r.ok) return fail(422, "Please fix the highlighted fields and try again.", { errors: r.errors });
+  // A file kept on this server must have been uploaded with this applicant's own pass.
+  for (const k of L2_DOC_FIELDS) { const m = STORED_L2_FILE.exec(r.data[k]); if (m && m[1] !== pass.code) return fail(422, "Please upload that document again.", { errors: { [k]: "Please upload this document again." } }); }
   const { declaration: _d, ...answers } = r.data;
   const app: Level2Application = { ...Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, String(v ?? "")])) as Omit<Level2Application, "level1Code" | "submittedAt" | "level1Email">,
     level1Code: pass.code, submittedAt: new Date().toISOString(), level1Email: pass.email };
@@ -115,6 +117,34 @@ export async function level2Overview() {
 
 export async function level2Csv() {
   const subs = await getRepository().getLevel2Applications();
-  const lines = [LEVEL2_COLUMNS.map(([h]) => h), ...subs.map((s) => LEVEL2_COLUMNS.map(([, k]) => s[k] ?? ""))].map((r) => r.map(csvCell).join(","));
+  // Uploaded files are private: in the CSV they open through the staff file link (sign-in required).
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
+  const docKeys = new Set<string>(L2_DOC_FIELDS);
+  const cell = (k: string, v: string) => (site && docKeys.has(k) && (v.startsWith("stored:") || v.startsWith("https://res.cloudinary.com/")) ? `${site}/api/admin/files?url=${encodeURIComponent(v)}` : v);
+  const lines = [LEVEL2_COLUMNS.map(([h]) => h), ...subs.map((s) => LEVEL2_COLUMNS.map(([, k]) => cell(k, String(s[k] ?? ""))))].map((r) => r.map(csvCell).join(","));
   return { rows: subs.length, csv: "﻿" + lines.join("\r\n") + "\r\n" };
+}
+
+// ───────────── one submission (Admin → Level 2 → detail) ─────────────
+export interface Level2Document { field: string; label: string; status: "file" | "link" | "missing"; href: string; source: string; note: string }
+const DOC_LABELS: Array<[keyof Level2Application, string]> = [
+  ["doc1", "Business proposal, pitch deck or EOP"], ["doc2", "Other supporting document"], ["doc3", "Other supporting document"],
+  ["cacCertificate", "CAC certificate"], ["smedanCertificate", "SMEDAN certificate"], ["bankProof", "Bank account proof"],
+];
+/** Uploaded files open only through the signed-in staff viewer (permission checked, each view logged); pasted links are shown as they are. */
+export function level2Documents(a: Level2Application): Level2Document[] {
+  return DOC_LABELS.map(([field, label]) => {
+    const v = String(a[field] ?? "").trim();
+    const note = field === "cacCertificate" && a.hasCac === "YES" && !v ? "Required: the applicant said the SME has a CAC certificate." : "";
+    if (!v) return { field, label, status: "missing", href: "", source: "", note };
+    if (STORED_L2_FILE.test(v) || v.startsWith("https://res.cloudinary.com/"))
+      return { field, label, status: "file", href: `/api/admin/files?url=${encodeURIComponent(v)}&for=${encodeURIComponent(a.level1Code)}`, source: v.startsWith("stored:") ? "Uploaded (kept on the programme server)" : "Uploaded (Cloudinary)", note };
+    if (/^https:\/\/\S+$/i.test(v)) { let host = "link"; try { host = new URL(v).hostname.replace(/^www\./, ""); } catch { /* keep "link" */ } return { field, label, status: "link", href: v, source: `Link pasted by the applicant (${host})`, note }; }
+    return { field, label, status: "missing", href: "", source: "", note: "The stored value is not a file or a link." };
+  });
+}
+export async function level2Submission(code: string): Promise<Level2Application | null> {
+  const c = cleanCode(code);
+  if (!REFERENCE_PATTERN.test(c)) return null;
+  return (await getRepository().getLevel2Applications()).find((x) => x.level1Code === c) ?? null;
 }
