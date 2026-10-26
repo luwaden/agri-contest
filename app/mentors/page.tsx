@@ -5,6 +5,11 @@ import { BulletList, InfoCard, PrimaryCard } from "@/components/ui/cards";
 import { Waves } from "@/components/landing/art";
 import { Reveal } from "@/components/ui/motion";
 import { PANEL_PAGE } from "@/config/mentors";
+import { OFF_MESSAGE, featureOn } from "@/lib/features";
+import { PROGRAMME } from "@/config/programme";
+
+/** Rendered on each visit (cheap: the switches are cached), so Admin → Settings → Panel application form applies at once. */
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Call for Experts: Mentors, Judges & Reviewers",
@@ -12,7 +17,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/mentors" },
 };
 
-export default function PanelPage() {
+export default async function PanelPage() {
+  const open = await featureOn("mentorForm");
   return (
     <PageShell>
       <section className="grid-bg relative overflow-hidden bg-white">
@@ -21,7 +27,7 @@ export default function PanelPage() {
           <p className="bubble inline-block rounded-2xl bg-azure px-5 py-2 text-base font-bold text-white">Call for Experts</p>
           <h1 className="mt-7 max-w-3xl font-display text-display-xl !font-extrabold text-primary">Mentors, judges <span className="text-azure">and reviewers.</span></h1>
           <p className="mt-5 max-w-2xl text-lg text-ink-soft sm:text-xl">{PANEL_PAGE.intro}</p>
-          <div className="mt-8"><a href="#panel-form" className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-base font-semibold text-white transition hover:bg-primary-800">Apply in 2 minutes</a></div>
+          {open && <div className="mt-8"><a href="#panel-form" className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-base font-semibold text-white transition hover:bg-primary-800">Apply in 2 minutes</a></div>}
         </div>
       </section>
 
@@ -49,7 +55,10 @@ export default function PanelPage() {
             <p className="mt-4 text-ink-soft">Eight answers and you are done. Fields marked <span className="text-danger-fg">*</span> are required. Your details are used only to assess your application and contact you.</p>
             <ol className="mt-6 space-y-2 text-sm text-ink-soft">{PANEL_PAGE.process.map(([t, d], i) => <li key={t}><strong className="text-primary">{i + 1}. {t}.</strong> {d}</li>)}</ol>
           </div>
-          <div className="rounded-card border border-paper-line bg-white p-5 shadow-card sm:p-9"><MentorApplicationForm /></div>
+          <div className="rounded-card border border-paper-line bg-white p-5 shadow-card sm:p-9">{open ? <MentorApplicationForm /> : (
+            <div role="status"><h3 className="font-display text-2xl font-extrabold text-primary">Applications are closed for now</h3>
+              <p className="mt-2 text-ink-soft">{OFF_MESSAGE.mentorForm}</p>
+              <p className="mt-2 text-sm text-ink-muted">Questions: <a href={`mailto:${PROGRAMME.contactEmail}`} className="font-semibold text-primary underline">{PROGRAMME.contactEmail}</a></p></div>)}</div>
         </div>
       </section>
     </PageShell>

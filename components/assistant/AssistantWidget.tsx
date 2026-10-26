@@ -11,14 +11,23 @@ const TITLE = { public: "Ask about the contest", panel: "Ask about scoring and t
  * Help assistant for every kind of user: visitors, applicants, mentors, judges, reviewers, coordinators and admins.
  * What it can answer depends on who is signed in (decided on the SERVER, never in this component).
  */
+/** One answer per page load: may visitors use the assistant? */
+let publicCheck: Promise<boolean> | null = null;
+
 export function AssistantWidget() {
   const path = usePathname() || "";
   // On the application form the mobile action bar sits at the bottom; keep the button clear of it.
   const lift = path.startsWith("/apply") && !path.startsWith("/apply/success") ? "bottom-24 sm:bottom-6" : "bottom-4 sm:bottom-6";
   const [open, setOpen] = useState(false);
-  // Shown to signed-in staff only (unless NEXT_PUBLIC_ASSISTANT_PUBLIC=true). Decided after mount, so nothing flashes.
+  // Shown to signed-in staff, and to visitors only when Admin → Settings allows it (asked once per page load, after mount, so nothing flashes).
   const [visible, setVisible] = useState(false);
-  useEffect(() => { setVisible(process.env.NEXT_PUBLIC_ASSISTANT_PUBLIC === "true" || document.cookie.split("; ").includes("agri_staff=1")); }, [path]);
+  useEffect(() => {
+    if (document.cookie.split("; ").includes("agri_staff=1")) { setVisible(true); return; }
+    let live = true;
+    publicCheck ??= fetch("/api/assistant", { cache: "no-store" }).then((r) => r.json()).then((d) => d.enabled !== false).catch(() => false);
+    publicCheck.then((on) => { if (live) setVisible(on); });
+    return () => { live = false; };
+  }, [path]);
   const [who, setWho] = useState<Who | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState(""); const [busy, setBusy] = useState(false); const [err, setErr] = useState("");

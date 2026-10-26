@@ -34,8 +34,8 @@ type UploadState = { kind: "idle" } | { kind: "uploading"; name: string; pct: nu
  * One document. Uploading is the main action (tap to choose, or drag a file here); pasting a link is the fallback.
  * Level 2 uploads carry the signed pass, so files land in that applicant's folder only.
  */
-function DocField({ name, label, kind, pass, hint, required, maxMb, onExpired, onBusy }:
-  { name: string; label: string; kind: string; pass: string; hint?: string; required?: boolean; maxMb: number; onExpired: () => void; onBusy: (name: string, busy: boolean) => void }) {
+function DocField({ name, label, kind, pass, hint, required, maxMb, uploads, onExpired, onBusy, onUploadsOff }:
+  { name: string; label: string; kind: string; pass: string; hint?: string; required?: boolean; maxMb: number; uploads: boolean; onExpired: () => void; onBusy: (name: string, busy: boolean) => void; onUploadsOff: () => void }) {
   const { values, errors, set } = useContext(FormCtx);
   const value: string = values[name] ?? "";
   const meta: { name: string; bytes: number } | undefined = values[`${name}__file`];
@@ -62,10 +62,13 @@ function DocField({ name, label, kind, pass, hint, required, maxMb, onExpired, o
     const done = () => { xhr.current = null; onBusy(name, false); if (input.current) input.current.value = ""; };
     req.onload = () => {
       done();
-      const d = (req.response ?? {}) as { url?: string; message?: string };
+      const d = (req.response ?? {}) as { url?: string; message?: string; code?: string };
       if (req.status === 401) { setSt({ kind: "error", message: d.message ?? "Your session has expired." }); onExpired(); return; }
+      if (d.code === "FEATURE_OFF") { setSt({ kind: "error", message: d.message ?? "File upload is switched off. Please paste a link instead." }); setLinkMode(true); onUploadsOff(); return; }
       if (req.status < 200 || req.status >= 300 || !d.url) {
-        setSt({ kind: "error", message: d.message ?? (req.status === 429 ? "Too many uploads in a short time. Please wait a few minutes and try again." : "The upload did not go through. Please try again."), retry: req.status >= 500 || req.status === 429 || req.status === 0 ? file : undefined });
+        const message = req.status === 413 ? `That file (${fmtSize(file.size)}) is too large for the server to receive. Please choose a smaller file (under 4 MB), or paste a link instead.`
+          : d.message ?? (req.status === 429 ? "Too many uploads in a short time. Please wait a few minutes and try again." : "The upload did not go through. Please try again.");
+        setSt({ kind: "error", message: d.code ? `${message} (code ${d.code})` : message, retry: d.code === "UPLOAD_NOT_CONFIGURED" ? undefined : req.status >= 500 || req.status === 429 || req.status === 0 ? file : undefined });
         return;
       }
       set(name, d.url); set(`${name}__file`, { name: file.name, bytes: file.size }); setLinkMode(false); setSt({ kind: "idle" });
@@ -99,16 +102,16 @@ function DocField({ name, label, kind, pass, hint, required, maxMb, onExpired, o
           <p className="min-w-0 text-sm"><span className="mr-1.5 font-bold text-primary" aria-hidden="true">✓</span><span className="font-medium">{meta?.name ?? "File uploaded"}</span>
             {meta && <span className="text-ink-muted tabular-nums"> · {fmtSize(meta.bytes)}</span>}<span className="sr-only"> uploaded</span></p>
           <div className="flex gap-2">
-            <button type="button" onClick={() => input.current?.click()} className={`${btn} min-h-[36px] border border-paper-line bg-white px-4 py-1 text-ink`}>Replace</button>
+            {uploads && <button type="button" onClick={() => input.current?.click()} className={`${btn} min-h-[36px] border border-paper-line bg-white px-4 py-1 text-ink`}>Replace</button>}
             <button type="button" onClick={remove} className={`${btn} min-h-[36px] px-3 py-1 text-danger-fg`} aria-label={`Remove ${meta?.name ?? "file"}`}>Remove</button>
           </div>
         </div>
-      ) : linkMode ? (
+      ) : linkMode || !uploads ? (
         <div className="space-y-2">
           <input type="url" inputMode="url" value={value} onChange={(e) => set(name, e.target.value)} placeholder="https://drive.google.com/…" aria-labelledby={`${id}-label`}
             aria-invalid={!!error} aria-describedby={[hint ? hintId : "", error ? errId : ""].filter(Boolean).join(" ") || undefined} className={`input-base ${error ? "input-error" : ""}`} />
-          <p className="text-xs text-ink-muted">Make sure anyone with the link can view the file.{" "}
-            <button type="button" onClick={() => { set(name, ""); setLinkMode(false); }} className="font-semibold text-primary underline">Upload a file instead</button></p>
+          <p className="text-xs text-ink-muted">Make sure anyone with the link can view the file.{uploads && <>{" "}
+            <button type="button" onClick={() => { set(name, ""); setLinkMode(false); }} className="font-semibold text-primary underline">Upload a file instead</button></>}</p>
         </div>
       ) : (
         <div onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
@@ -121,7 +124,7 @@ function DocField({ name, label, kind, pass, hint, required, maxMb, onExpired, o
         </div>
       )}
 
-      {!uploaded && !linkMode && st.kind !== "uploading" && (
+      {uploads && !uploaded && !linkMode && st.kind !== "uploading" && (
         <button type="button" onClick={() => { setLinkMode(true); setSt({ kind: "idle" }); }} className="text-sm font-semibold text-primary underline">Paste a link instead (Google Drive, Dropbox…)</button>
       )}
       {error && (
@@ -132,7 +135,8 @@ function DocField({ name, label, kind, pass, hint, required, maxMb, onExpired, o
   );
 }
 
-export function Level2Form({ uploadMaxMb = 8 }: { uploadMaxMb?: number }) {
+export function Level2Form({ uploadMaxMb = 8, uploadsAllowed = true }: { uploadMaxMb?: number; uploadsAllowed?: boolean }) {
+  const [uploadsOn, setUploadsOn] = useState(uploadsAllowed);
   const [step, setStep] = useState<"start" | "form" | "done">("start");
   const [code, setCode] = useState(""); const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -212,7 +216,7 @@ export function Level2Form({ uploadMaxMb = 8 }: { uploadMaxMb?: number }) {
   );
 
   const v = values;
-  const docProps = { maxMb: uploadMaxMb, onExpired: expired, onBusy };
+  const docProps = { maxMb: uploadMaxMb, uploads: uploadsOn, onExpired: expired, onBusy, onUploadsOff: () => setUploadsOn(false) };
   return (
     <FormCtx.Provider value={ctx}>
       <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-9" aria-busy={busy}>
@@ -254,7 +258,7 @@ export function Level2Form({ uploadMaxMb = 8 }: { uploadMaxMb?: number }) {
           {v.hasOtherNeeds === "YES" && <TextAreaField name="otherNeeds" label="Please state the other needs" required max={600} rows={3} />}
         </FormSection>
 
-        <FormSection title="Documents" description="Choose each file from your phone or computer, or take a photo of a paper document. If a file is too large, you can paste a link to it instead (for example a Google Drive link that anyone with the link can view).">
+        <FormSection title="Documents" description={uploadsOn ? "Choose each file from your phone or computer, or take a photo of a paper document. If a file is too large, you can paste a link to it instead (for example a Google Drive link that anyone with the link can view)." : "Paste a link to each document, for example a Google Drive link. In Google Drive choose Share → General access → Anyone with the link, then copy the link."}>
           <DocField name="doc1" label="Supporting document: business proposal, pitch deck or EOP (economics of production)" kind="L2_SUPPORTING" pass={pass} required {...docProps} />
           <DocField name="doc2" label="Another supporting document" kind="L2_SUPPORTING" pass={pass} {...docProps} />
           <DocField name="doc3" label="Another supporting document" kind="L2_SUPPORTING" pass={pass} {...docProps} />

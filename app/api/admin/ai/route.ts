@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { featureOff, featureOn } from "@/lib/features";
 import { requireApiPermission } from "@/lib/auth/server";
 import { badRequest, clientIp, rateLimit, readJson, sameOrigin, serverError, tooMany } from "@/lib/http";
 import { parseFilters } from "@/lib/analytics/filters";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const auth = await requireApiPermission("ai:query");
   if ("error" in auth) return auth.error;
+  if (!(await featureOn("aiAssistant"))) return featureOff("aiAssistant");
   if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
   try {
     const rl = await rateLimit(`ai:${auth.user.email}:${clientIp(req)}`, 20, 10 * 60_000);

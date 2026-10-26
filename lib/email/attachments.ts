@@ -38,8 +38,16 @@ export async function saveAttachment(buf: Uint8Array, filename: string): Promise
   if (sniff(buf) !== t.sniffed) return { ok: false, message: "The file does not match its file type. Please attach the original file." };
   const id = `ATT-${randomBytes(12).toString("hex")}`;
   const info: AttachmentInfo = { id, name: safeFileName(filename, ext), bytes: buf.length, mime: t.mime };
-  await saveLocal(`email-attachments/${id}/file.${ext}`, buf);
-  await writeLocalJson(`email-attachments/${id}/meta.json`, info);
+  try {
+    await saveLocal(`email-attachments/${id}/file.${ext}`, buf);
+    await writeLocalJson(`email-attachments/${id}/meta.json`, info);
+  } catch (e) {
+    const m = `${(e as { code?: string }).code ?? ""} ${(e as Error).message}`;
+    console.error("[attachments] could not store:", m);
+    return { ok: false, message: /EROFS|EACCES|EPERM|read-only/i.test(m)
+      ? "Attachments cannot be kept on this host (its disk is read-only, as on Vercel). Share the file as a link in the message instead."
+      : "The file could not be saved on the server. Please try again." };
+  }
   return { ok: true, data: info };
 }
 

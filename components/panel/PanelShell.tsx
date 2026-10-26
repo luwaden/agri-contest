@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FeatureOffNotice } from "@/components/admin/FeatureOffNotice";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { homeFor, roleLabel } from "@/lib/auth/permissions";
@@ -21,7 +22,7 @@ export function PanelShell({ user, children }: { user: SessionUser; children: Re
           <div className="flex items-center gap-3 text-sm"><span className="hidden text-white/80 sm:inline">{user.name} · {roleLabel(user.role)}</span><span className="[&_button]:!text-sun"><SignOutButton /></span></div>
         </div>
       </header>
-      <main id="main" className="container-page max-w-7xl py-8">{children}</main>
+      <main id="main" className="container-page max-w-7xl py-8"><div className="mb-6 empty:hidden"><FeatureOffNotice keys={["panelScoring"]} /></div>{children}</main>
     </div>
   );
 }

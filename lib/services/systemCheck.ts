@@ -1,4 +1,5 @@
 import { getRepository } from "@/lib/repository";
+import { featureOn } from "@/lib/features";
 import { kv, redisConfigured } from "@/lib/kv";
 import { sheetsConfigured } from "@/lib/google-sheets/client";
 import { appsScriptConfigured } from "@/lib/google-sheets/appsScript";
@@ -107,7 +108,7 @@ export async function runSystemCheck(actor: string): Promise<{ ok: boolean; vers
   }));
 
   steps.push(await step("ai", "AI assistant", async () => {
-    const p = getAIProvider(); const pub = process.env.NEXT_PUBLIC_ASSISTANT_PUBLIC === "true";
+    const p = getAIProvider(); const pub = await featureOn("publicAssistant");
     return { status: "pass", detail: `${p ? (p.configured() ? `${p.name} switched on` : `${p.name} selected but key/model missing (quick answers only)`) : "off (quick answers only)"}; visible to ${pub ? "everyone" : "signed-in staff only"}.` };
   }));
 

@@ -4,18 +4,20 @@ import { badRequest, clientIp, rateLimit, readJson, sameOrigin, serverError, too
 import { askAssistant, type Turn } from "@/lib/services/assistantService";
 import { SUGGESTIONS } from "@/config/knowledge";
 import { getAIProvider } from "@/lib/ai";
+import { featureOn } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
-/** The assistant is for signed-in staff only, unless NEXT_PUBLIC_ASSISTANT_PUBLIC=true is set (then visitors get it too). */
-const publicOn = () => process.env.NEXT_PUBLIC_ASSISTANT_PUBLIC === "true";
+/** The assistant is for signed-in staff only, unless Admin → Settings → "Help assistant for visitors" is on
+ *  (its default comes from NEXT_PUBLIC_ASSISTANT_PUBLIC). */
+const publicOn = () => featureOn("publicAssistant");
 
 const audienceOf = (role?: string) => (role === "ADMIN" || role === "COORDINATOR" ? "admin" : role === "JUDGE" || role === "REVIEWER" ? "panel" : "public") as "public" | "panel" | "admin";
 
 /** Who is asking and what to suggest. Works for visitors and signed-in staff. */
 export async function GET() {
   const user = await getCurrentUser().catch(() => null);
-  if (!user && !publicOn()) return NextResponse.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
+  if (!user && !(await publicOn())) return NextResponse.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
   const audience = audienceOf(user?.role);
   const ai = getAIProvider();
   return NextResponse.json({ enabled: true, audience, role: user?.role ?? null, suggestions: SUGGESTIONS[audience], ai: Boolean(ai?.configured()) }, { headers: { "Cache-Control": "no-store" } });
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
   try {
     if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
     const user = await getCurrentUser().catch(() => null);
-    if (!user && !publicOn()) return NextResponse.json({ message: "The assistant is available to programme staff only. Please sign in." }, { status: 401 });
+    if (!user && !(await publicOn())) return NextResponse.json({ message: "The assistant is available to programme staff only. Please sign in." }, { status: 401 });
     // Staff get a higher allowance, visitors are limited per network address.
     const rl = user ? await rateLimit(`assist:u:${user.email}`, 40, 10 * 60_000) : await rateLimit(`assist:ip:${clientIp(req)}`, 15, 10 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfter);

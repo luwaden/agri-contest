@@ -170,3 +170,29 @@ test("detail page: each document labelled; uploads open through the staff viewer
   assert.equal(by.cacCertificate.status, "missing"); assert.match(by.cacCertificate.note, /Required/);
   assert.deepEqual([by.bankProof.status, by.bankProof.href], ["missing", ""], "anything that is not a file or an https link is never made clickable");
 });
+
+test("upload failures say why: Vercel without Cloudinary, read-only disk, Cloudinary refusing the login", async () => {
+  const U = await import("../lib/services/uploadService");
+  const pdf = new TextEncoder().encode("%PDF-1.4\n% test\n%%EOF");
+  const input = { buffer: pdf, filename: "p.pdf", scope: "level2" as const, ownerId: apps[1].applicationId, kind: "L2_SUPPORTING" };
+
+  process.env.VERCEL = "1";
+  try {
+    assert.equal(U.level2Storage(), "none");
+    const r = await U.storeUpload(input);
+    assert.equal(r.status, 503); assert.equal((r as any).body.code, "UPLOAD_NOT_CONFIGURED"); assert.match((r as any).body.message, /paste a link/);
+  } finally { delete process.env.VERCEL; }
+
+  assert.equal(U.uploadFailureCode(Object.assign(new Error("EROFS: read-only file system, mkdir '/var/task/.data'"), { code: "EROFS" })), "DISK_READ_ONLY");
+  assert.equal(U.uploadFailureCode(new Error("Cloudinary upload failed (400): Invalid image file")), "CLOUDINARY_REFUSED");
+  assert.equal(U.uploadFailureCode(new Error("fetch failed")), "CLOUDINARY_UNREACHABLE");
+
+  Object.assign(process.env, { CLOUDINARY_CLOUD_NAME: "demo", CLOUDINARY_API_KEY: "k", CLOUDINARY_API_SECRET: "s" });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ error: { message: "Invalid Signature 1234. String to sign - 'context=...'." } }), { status: 401 })) as typeof fetch;
+  try {
+    assert.equal(U.level2Storage(), "cloudinary");
+    const r = await U.storeUpload(input);
+    assert.equal(r.status, 502); assert.equal((r as any).body.code, "CLOUDINARY_LOGIN");
+  } finally { globalThis.fetch = realFetch; delete process.env.CLOUDINARY_CLOUD_NAME; delete process.env.CLOUDINARY_API_KEY; delete process.env.CLOUDINARY_API_SECRET; }
+});

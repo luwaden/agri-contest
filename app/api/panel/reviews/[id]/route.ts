@@ -4,6 +4,7 @@ import { readJson, sameOrigin, serverError } from "@/lib/http";
 import { REFERENCE_PATTERN } from "@/lib/reference";
 import { declareConflict, saveScoreSheet } from "@/lib/services/reviewService";
 import { setDecision } from "@/lib/services/screeningService";
+import { featureOff, featureOn } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
@@ -14,6 +15,7 @@ async function guard(req: NextRequest, ctx: Ctx) {
   if (!sameOrigin(req)) return { error: NextResponse.json({ message: "This request was not allowed." }, { status: 403 }) };
   const { id } = await ctx.params;
   if (!REFERENCE_PATTERN.test(id)) return { error: NextResponse.json({ message: "This application is not assigned to you." }, { status: 404 }) };
+  if (!(await featureOn("panelScoring"))) return { error: featureOff("panelScoring") };   // Admin → Settings: round closed
   return { user: auth.user, id };
 }
 const send = (r: { ok: boolean; status: number; data?: unknown; body?: unknown }) => NextResponse.json(r.ok ? r.data : r.body, { status: r.status, headers: { "Cache-Control": "no-store" } });

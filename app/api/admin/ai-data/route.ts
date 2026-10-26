@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { featureOff, featureOn } from "@/lib/features";
 import { requireApiPermission } from "@/lib/auth/server";
 import { clientIp, rateLimit, readJson, sameOrigin, serverError, tooMany } from "@/lib/http";
 import { askDataDesk } from "@/lib/services/aiDataDesk";
@@ -11,6 +12,7 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
   const auth = await requireApiPermission("ai:data");
   if ("error" in auth) return auth.error;
+  if (!(await featureOn("aiDataDesk"))) return featureOff("aiDataDesk");
   if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
   try {
     const rl = await rateLimit(`ai-data:${auth.user.email}:${clientIp(req)}`, 30, 10 * 60_000);

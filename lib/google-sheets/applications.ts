@@ -1,6 +1,6 @@
 import "server-only";
 import type { Application, ApplicationStatus } from "@/types/application";
-import type { ApplicationRepository, AuditEvent, DraftRecord } from "@/lib/repository/types";
+import type { ApplicationRepository, AuditEvent, ConfigRow, DraftRecord } from "@/lib/repository/types";
 import { sheets as restTransport } from "./client";
 import type { SheetTransport } from "./transport";
 import { HEADERS, SHEETS, applicationToRow, describeHeaderProblem, rowToApplication } from "./schema";
@@ -159,6 +159,12 @@ export class SheetsRepository implements ApplicationRepository {
   }
 
   // ── Level 2 (append-only) ──
+  async getConfiguration(): Promise<ConfigRow[]> {
+    return (await this.optionalRows(SHEETS.configuration)).filter((r) => r[0]).map((r) => ({ key: r[0].trim(), value: unguardText(r[1] ?? ""), updatedAt: r[2] ?? "", updatedBy: unguardText(r[3] ?? "") }));
+  }
+  async appendConfiguration(row: ConfigRow) {
+    await this.sheets.append(SHEETS.configuration, [row.key, guardText(row.value), row.updatedAt, guardText(row.updatedBy)]);
+  }
   async getLevel2Invites(): Promise<Level2Invite[]> {
     return (await this.optionalRows(SHEETS.level2Invites)).filter((r) => r[0]).map((r) => ({ level1Code: r[0].trim().toUpperCase(), invitedAt: r[1] ?? "", invitedBy: unguardText(r[2] ?? ""), note: unguardText(r[3] ?? "") }));
   }

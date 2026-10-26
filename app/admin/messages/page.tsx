@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FeatureOffNotice } from "@/components/admin/FeatureOffNotice";
 import { PortalShell } from "@/components/admin/PortalShell";
 import { Messages } from "@/components/admin/messages/Messages";
 import { requirePagePermission } from "@/lib/auth/server";
@@ -22,6 +23,7 @@ export default async function MessagesPage() {
       <div className="mx-auto max-w-4xl space-y-6">
         <div><h1 className="font-display text-3xl font-extrabold">Messages</h1>
           <p className="mt-1 text-sm text-ink-soft">Email applicants, your panel, or any other email address. Each person gets their own copy with their name filled in (and their reference number, if they applied). Every email is recorded in the Email Log tab.</p></div>
+        <FeatureOffNotice keys={["messages"]} settingsLink />
         <Messages initial={overview} />
       </div>
     </PortalShell>

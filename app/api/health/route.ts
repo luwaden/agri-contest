@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     status: "ok", time: new Date().toISOString(), version: APP_VERSION, commit: commit(), features: FEATURES,
     integrations: {
       dataStore: backend, sheets: sheetsConfigured(), appsScript: appsScriptConfigured(), cloudinary: cloudinaryConfigured(), redis: redisConfigured(),
-      assistant: process.env.NEXT_PUBLIC_ASSISTANT_PUBLIC === "true" ? "everyone" : "staff only",
+      assistant: `set in Admin → Settings (default: ${process.env.NEXT_PUBLIC_ASSISTANT_PUBLIC === "true" ? "everyone" : "staff only"})`,
       googleScriptMirror: Boolean(process.env.GOOGLE_SCRIPT_URL), ai: ai ? (ai.configured() ? ai.name : `${ai.name} (missing key/model)`) : "off",
       production: process.env.NODE_ENV === "production",
     },

@@ -1,4 +1,6 @@
 import type { Level2Application, Level2Invite } from "@/types/level2";
+/** One row of the "Configuration" tab. */
+export interface ConfigRow { key: string; value: string; updatedAt: string; updatedBy: string }
 import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import type { Application, ApplicationStatus } from "@/types/application";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
@@ -65,6 +67,9 @@ export interface ApplicationRepository {
   getLevel2Applications(): Promise<Level2Application[]>;
   /** Throws DUPLICATE_LEVEL2 if this Level 1 code already has a Level 2 application. */
   createLevel2Application(a: Level2Application): Promise<void>;
+  // Settings (the "Configuration" tab; append-only: the newest row for a key wins, older rows are the history).
+  getConfiguration(): Promise<ConfigRow[]>;
+  appendConfiguration(row: ConfigRow): Promise<void>;
   /** Cheap, read-only check used by /api/health?check=store. Never returns secrets. */
   diagnose(): Promise<StoreDiagnosis>;
   logEvent(event: AuditEvent): Promise<void>;

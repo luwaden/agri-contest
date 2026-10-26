@@ -13,6 +13,7 @@ import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import type { ServiceResult } from "./applicationService";
 import { loadStaff } from "@/lib/auth/users";
 import { rankedData } from "./screeningService";
+import { OFF_MESSAGE, featureOn } from "@/lib/features";
 
 /**
  * MESSAGES TO APPLICANTS (Admin → Messages).
@@ -179,6 +180,7 @@ export async function sendTest(input: unknown, me: string): Promise<ServiceResul
   const p = composeSchema.safeParse(input);
   if (!p.success) return fail(422, p.error.issues[0]?.message ?? "Please check the message.");
   if (emailProvider() === "off") return fail(503, "Email is not set up on this server (GMAIL_USER and GMAIL_APP_PASSWORD).");
+  if (!(await featureOn("messages"))) return fail(503, OFF_MESSAGE.messages, { code: "FEATURE_OFF" });
   const r = await resolve(p.data.audience);
   if (!r.list.length) return fail(422, "Nobody is in that group, so there is nothing to fill in.");
   const att = await checkAttachments(p.data.attachments);
@@ -196,6 +198,7 @@ export async function createCampaign(input: unknown, actor: string): Promise<Ser
   const bad = unknownFillIns(p.data.subject, p.data.heading, p.data.body);
   if (bad.length) return fail(422, `Unknown fill-in: {${bad.join("}, {")}}.`);
   if (emailProvider() === "off") return fail(503, "Email is not set up on this server (GMAIL_USER and GMAIL_APP_PASSWORD).");
+  if (!(await featureOn("messages"))) return fail(503, OFF_MESSAGE.messages, { code: "FEATURE_OFF" });
   const att = await checkAttachments(p.data.attachments);
   if (!att.ok) return fail(422, att.message);
   const r = await resolve(p.data.audience);
@@ -266,6 +269,8 @@ export async function sendBatch(campaignId: string, actor: string): Promise<Serv
     const [campaigns, log] = await Promise.all([repo.getEmailCampaigns(), repo.getEmailLog()]);
     const c = campaigns.find((x) => x.campaignId === campaignId);
     if (!c) return fail(404, "Message not found.");
+    // Switched off in Admin → Settings: stop here; Continue works again once it is back on.
+    if (!(await featureOn("messages"))) return { ok: true, status: 200, data: { done: false, stopped: "FEATURE_OFF", progress: view(c, log) } };
     const mine = log.filter((l) => l.campaignId === campaignId);
     if (mine.some((l) => l.status === "CANCELLED")) return { ok: true, status: 200, data: { done: true, stopped: "CANCELLED", progress: view(c, log) } };
     const today = lagosDay(now());

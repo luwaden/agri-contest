@@ -103,6 +103,9 @@ async function contract(name: string, repo: ApplicationRepository) {
   assert.deepEqual(await repo.getEmailCampaigns(), [camp], `${name}: campaign round trip`);
   await repo.appendEmailLog([{ at: "2026-10-19T10:01:00Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA2", email: "k@example.com", status: "SENT", detail: "em_1" }, { at: "2026-10-19T10:01:01Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA3", email: "l@example.com", status: "FAILED", detail: "-TIMEOUT" }]);
   const lg = await repo.getEmailLog(); assert.equal(lg.length, 2); assert.equal(lg[1].detail, "-TIMEOUT", `${name}: log round trip (guarded text)`);
+  // Settings (Configuration tab; append-only)
+  await repo.appendConfiguration({ key: "feature.mentorForm", value: "off", updatedAt: "2026-10-26T10:00:00Z", updatedBy: "=admin@example.org" });
+  assert.deepEqual(await repo.getConfiguration(), [{ key: "feature.mentorForm", value: "off", updatedAt: "2026-10-26T10:00:00Z", updatedBy: "=admin@example.org" }], `${name}: configuration round trip`);
   // Level 2 (append-only, one per code)
   await repo.addLevel2Invites([{ level1Code: "AGRA-2026-AAAAA2", invitedAt: "2026-10-23T10:00:00Z", invitedBy: "a@example.org", note: "=Focal" }]);
   assert.deepEqual(await repo.getLevel2Invites(), [{ level1Code: "AGRA-2026-AAAAA2", invitedAt: "2026-10-23T10:00:00Z", invitedBy: "a@example.org", note: "=Focal" }], `${name}: invite round trip`);

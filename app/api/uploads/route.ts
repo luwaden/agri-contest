@@ -4,6 +4,7 @@ import { getWindowStatus } from "@/lib/window";
 import { MAX_BYTES } from "@/lib/cloudinary/validate";
 import { storeUpload } from "@/lib/services/uploadService";
 import { level2Pass } from "@/lib/services/level2Service";
+import { featureOff, features } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,6 +27,10 @@ export async function POST(req: NextRequest) {
     const scope = String(form?.get("scope") ?? ""), kind = String(form?.get("kind") ?? "");
     let owner = String(form?.get("owner") ?? "");
     if (!(file instanceof File) || (scope !== "applicant" && scope !== "mentor" && scope !== "level2")) return NextResponse.json({ message: "Please choose a file to upload." }, { status: 400 });
+    const on = await features();   // switches in Admin → Settings
+    if (scope === "level2" && !on.level2Form) return featureOff("level2Form");
+    if (scope === "level2" && !on.level2Uploads) return featureOff("level2Uploads");
+    if (scope === "mentor" && !on.mentorForm) return featureOff("mentorForm");
     if (scope === "level2") {   // only a person holding a valid Level 2 pass; files go to that Level 1 code's folder
       const pass = level2Pass(form?.get("pass"));
       if (!pass) return NextResponse.json({ message: "Your session has expired. Please start again with your Level 1 code and email." }, { status: 401 });

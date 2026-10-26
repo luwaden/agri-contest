@@ -7,6 +7,7 @@ import { emailLevel2Received } from "@/lib/email/notify";
 import { LEVEL2, L2_CROPS } from "@/config/level2";
 import { PROGRAMME } from "@/config/programme";
 import { REFERENCE_PATTERN } from "@/lib/reference";
+import { OFF_MESSAGE, featureOn } from "@/lib/features";
 import { LEVEL2_COLUMNS } from "@/lib/google-sheets/level2Schema";
 import { csvCell } from "@/lib/csv";
 import type { Application } from "@/types/application";
@@ -54,6 +55,7 @@ function prefill(a: Application): Partial<Record<keyof Level2Form, string>> {
 
 export async function startLevel2(input: { code?: unknown; email?: unknown }): Promise<ServiceResult<{ token: string; code: string; prefill: Record<string, string> }>> {
   if (closed()) return fail(403, "Level 2 applications are closed.");
+  if (!(await featureOn("level2Form"))) return fail(503, OFF_MESSAGE.level2Form, { code: "FEATURE_OFF" });
   // Codes/emails pasted from email or WhatsApp often carry long dashes, spaces or invisible characters.
   const code = cleanCode(input.code), email = cleanEmail(input.email);
   if (!REFERENCE_PATTERN.test(code) || !email.includes("@")) { console.warn(`[level2] refused: code format "${code}"`); return fail(422, NOT_FOUND); }
@@ -73,6 +75,7 @@ export async function submitLevel2(token: unknown, values: Record<string, unknow
   const pass = readLevel2Token(token);
   if (!pass) return fail(401, "Your session has expired. Please start again with your Level 1 code and email (your answers are still on this page).", { code: "PASS_EXPIRED" });
   if (closed()) return fail(403, "Level 2 applications are closed.");
+  if (!(await featureOn("level2Form"))) return fail(503, OFF_MESSAGE.level2Form, { code: "FEATURE_OFF" });
   if (!(await isAllowed(pass.code))) return fail(403, "This Level 1 application is not invited to Level 2.");
   const r = validateLevel2(values);
   if (!r.ok) return fail(422, "Please fix the highlighted fields and try again.", { errors: r.errors });

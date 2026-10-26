@@ -4,12 +4,12 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Application, ApplicationStatus } from "@/types/application";
-import type { ApplicationRepository, AuditEvent, DraftRecord } from "./types";
+import type { ApplicationRepository, AuditEvent, ConfigRow, DraftRecord } from "./types";
 import type { MentorApplication, MentorStatus } from "@/types/mentor";
 import type { StaffAccount } from "@/types/staff";
 import type { PanelReview } from "@/types/review";
 
-interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[]; campaigns?: EmailCampaign[]; emailLog?: EmailLogRow[]; level2?: Level2Application[]; level2Invites?: Level2Invite[] }
+interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[]; campaigns?: EmailCampaign[]; emailLog?: EmailLogRow[]; level2?: Level2Application[]; level2Invites?: Level2Invite[]; configuration?: ConfigRow[] }
 const FILE = path.join(process.cwd(), ".data", "dev-store.json");
 
 let queue: Promise<unknown> = Promise.resolve();
@@ -103,6 +103,8 @@ export class LocalRepository implements ApplicationRepository {
   getEmailCampaigns = () => serial(async () => (await load()).campaigns ?? []);
   getEmailLog = () => serial(async () => (await load()).emailLog ?? []);
   appendEmailLog = (rows: EmailLogRow[]) => serial(async () => { const s = await load(); (s.emailLog ??= []).push(...rows); await save(s); });
+  getConfiguration = () => serial(async () => (await load()).configuration ?? []);
+  appendConfiguration = (row: ConfigRow) => serial(async () => { const s = await load(); (s.configuration ??= []).push(row); await save(s); });
   getLevel2Invites = () => serial(async () => (await load()).level2Invites ?? []);
   addLevel2Invites = (rows: Level2Invite[]) => serial(async () => { const s = await load(); (s.level2Invites ??= []).push(...rows); await save(s); });
   getLevel2Applications = () => serial(async () => (await load()).level2 ?? []);

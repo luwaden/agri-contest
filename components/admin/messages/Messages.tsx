@@ -20,6 +20,7 @@ const STOP: Record<string, string> = {
   GMAIL_LOGIN_REJECTED: "Gmail refused the login. Check GMAIL_USER and GMAIL_APP_PASSWORD on the server.",
   DOMAIN_NOT_VERIFIED: "The sending domain is not verified with Resend.",
   CANCELLED: "This message was cancelled.",
+  FEATURE_OFF: "Sending is switched off in Admin → Settings. Turn it back on, then press Continue: nobody gets the message twice.",
   ATTACHMENT_MISSING: "An attached file is no longer on the server, so nothing was sent. Cancel this message and send it again with the file attached.",
 };
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.pptx,.xlsx";

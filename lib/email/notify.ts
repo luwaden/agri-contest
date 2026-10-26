@@ -4,6 +4,7 @@ import { getRepository } from "@/lib/repository";
 import { emailProvider, sendEmail, type EmailMessage } from "./send";
 import { applicantConfirmation, teamMessage } from "./templates";
 import { PROGRAMME } from "@/config/programme";
+import { featureOn } from "@/lib/features";
 
 /**
  * Only APPLICANTS get an email (one confirmation each). Panel applications and team notices send nothing.
@@ -17,6 +18,8 @@ function inBackground(task: () => Promise<void>) {
 }
 
 async function deliver(kind: string, ref: string, msg: EmailMessage) {
+  // Admin → Settings → "Automatic confirmation emails". Checked when sending, never before the submission is saved.
+  if (!(await featureOn("confirmationEmails").catch(() => true))) { console.log(`[email] ${kind} for ${ref} not sent: confirmation emails are switched off`); return; }
   const r = await sendEmail(msg);
   if (r.ok) { console.log(`[email] ${kind} for ${ref} sent via ${r.provider}`); return; }
   if (r.reason === "EMAIL_OFF") return;
