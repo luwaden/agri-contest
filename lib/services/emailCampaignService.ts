@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getRepository } from "@/lib/repository";
 import { emailProvider, emailSetupProblem, sendEmail } from "@/lib/email/send";
 import { teamMessage } from "@/lib/email/templates";
+import { ATTACHMENT_ID, MAX_ATTACHMENTS, attachmentLimitBytes, attachmentsInfo, loadAttachments, type AttachmentInfo } from "@/lib/email/attachments";
 import { listSpecSchema, buildList } from "@/lib/screening/customList";
 import { isLiveReview } from "@/types/review";
 import { buildResults } from "@/lib/judging";
@@ -131,11 +132,23 @@ const messageSchema = z.object({
   subject: z.string().trim().min(3, "Write a subject.").max(150),
   heading: z.string().trim().max(120).default(""),
   body: z.string().trim().min(10, "Write the message.").max(8000),
+  /** Files uploaded through /api/admin/messages/attachments (ids only). */
+  attachments: z.array(z.string().regex(ATTACHMENT_ID, "An attachment could not be found. Remove it and attach it again."))
+    .max(MAX_ATTACHMENTS, `At most ${MAX_ATTACHMENTS} attachments.`).default([]).transform((a) => [...new Set(a)]),
 });
 const composeSchema = messageSchema.extend({ audience: audienceSchema });
 
 function render(m: z.infer<typeof messageSchema>, r: Recipient, key: string) {
   return teamMessage({ to: r.email, subject: fill(m.subject, r), heading: fill(m.heading || m.subject, r), body: fill(m.body, r), ref: r.applicationId, key });
+}
+/** The attached files must all exist and fit in one email. */
+async function checkAttachments(ids: string[]): Promise<{ ok: true; list: AttachmentInfo[] } | { ok: false; message: string }> {
+  if (!ids.length) return { ok: true, list: [] };
+  const { list, missing } = await attachmentsInfo(ids);
+  if (missing.length) return { ok: false, message: "An attached file is no longer on the server. Remove it and attach it again." };
+  const total = list.reduce((n, a) => n + a.bytes, 0);
+  if (total > attachmentLimitBytes()) return { ok: false, message: `The attachments add up to ${(total / 1048576).toFixed(1)} MB. The limit is ${Math.round(attachmentLimitBytes() / 1048576)} MB per email: remove one, or share a link instead.` };
+  return { ok: true, list };
 }
 const tooBig = (list: Recipient[]) => JSON.stringify(list.map((r) => r.stored)).length > 45_000;   // one sheet cell holds 50,000 characters
 
@@ -144,6 +157,8 @@ export async function preview(input: unknown): Promise<ServiceResult<Record<stri
   if (!p.success) return fail(422, p.error.issues[0]?.message ?? "Please check the message.");
   const bad = unknownFillIns(p.data.subject, p.data.heading, p.data.body);
   if (bad.length) return fail(422, `Unknown fill-in: {${bad.join("}, {")}}. You can use: ${Object.keys(FILL_INS).map((k) => `{${k}}`).join(", ")}.`);
+  const att = await checkAttachments(p.data.attachments);
+  if (!att.ok) return fail(422, att.message);
   const r = await resolve(p.data.audience);
   if (r.list.length > MAX_RECIPIENTS || tooBig(r.list)) return fail(422, `That is ${r.list.length} people, too many for one message. Split the group (at most ${MAX_RECIPIENTS}).`);
   const first = r.list[0];
@@ -152,7 +167,7 @@ export async function preview(input: unknown): Promise<ServiceResult<Record<stri
     ...(r.invalid.length ? [`${r.invalid.length} left out because their email address is not valid: ${r.invalid.slice(0, 10).join(", ")}${r.invalid.length > 10 ? "…" : ""}`] : []),
   ];
   return { ok: true, status: 200, data: {
-    count: r.list.length, others: r.others, label: r.label, notFound: r.notFound, warnings,
+    count: r.list.length, others: r.others, label: r.label, notFound: r.notFound, warnings, attachments: att.list,
     sample: r.list.slice(0, 8).map((x) => ({ applicationId: x.applicationId ?? "not an applicant", name: fillIn(x, "full_name") || "(no name)", email: x.email })),
     email: first ? (({ subject, html, text }) => ({ subject, html, text, to: first.email }))(render(p.data, first, "preview")) : null,
     sender: emailProvider(), senderProblem: emailSetupProblem(), dailyLimit: dailyLimit(),
@@ -166,8 +181,11 @@ export async function sendTest(input: unknown, me: string): Promise<ServiceResul
   if (emailProvider() === "off") return fail(503, "Email is not set up on this server (GMAIL_USER and GMAIL_APP_PASSWORD).");
   const r = await resolve(p.data.audience);
   if (!r.list.length) return fail(422, "Nobody is in that group, so there is nothing to fill in.");
+  const att = await checkAttachments(p.data.attachments);
+  if (!att.ok) return fail(422, att.message);
+  const { files } = await loadAttachments(p.data.attachments);
   const msg = render(p.data, r.list[0], `test-${randomBytes(6).toString("hex")}`);
-  const sent = await sendEmail({ ...msg, to: me, subject: `[TEST] ${msg.subject}` });
+  const sent = await sendEmail({ ...msg, to: me, subject: `[TEST] ${msg.subject}`, attachments: files });
   await getRepository().appendEmailLog([{ at: now(), campaignId: "TEST", applicationId: r.list[0].applicationId ?? "EXTERNAL", email: me, status: "TEST", detail: sent.ok ? "sent to the administrator" : sent.reason }]).catch(() => {});
   return sent.ok ? { ok: true, status: 200, data: { sentTo: me } } : fail(502, `The test was not sent: ${sent.reason}`);
 }
@@ -178,26 +196,49 @@ export async function createCampaign(input: unknown, actor: string): Promise<Ser
   const bad = unknownFillIns(p.data.subject, p.data.heading, p.data.body);
   if (bad.length) return fail(422, `Unknown fill-in: {${bad.join("}, {")}}.`);
   if (emailProvider() === "off") return fail(503, "Email is not set up on this server (GMAIL_USER and GMAIL_APP_PASSWORD).");
+  const att = await checkAttachments(p.data.attachments);
+  if (!att.ok) return fail(422, att.message);
   const r = await resolve(p.data.audience);
   if (!r.list.length) return fail(422, "Nobody is in that group.");
   if (r.list.length > MAX_RECIPIENTS || tooBig(r.list)) return fail(422, `Too many people for one message (at most ${MAX_RECIPIENTS}); split the group.`);
-  // The heading travels inside the stored body so the Email Campaigns tab keeps its 7 columns.
+  // The heading and the attachment list travel inside the stored body so the Email Campaigns tab keeps its 7 columns.
   const c: EmailCampaign = { campaignId: `MSG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomBytes(3).toString("hex").toUpperCase()}`, createdAt: now(), createdBy: actor,
-    subject: p.data.subject, body: p.data.heading ? `#${p.data.heading}\n${p.data.body}` : p.data.body, audience: r.label, recipientIds: r.list.map((x) => x.stored) };
+    subject: p.data.subject, body: packBody(p.data.heading, p.data.body, att.list), audience: r.label, recipientIds: r.list.map((x) => x.stored) };
   await getRepository().createEmailCampaign(c);
-  await getRepository().logEvent({ at: c.createdAt, applicationId: "-", actor, action: "EMAIL_CAMPAIGN_CREATED", detail: `${c.campaignId} | ${c.audience}${r.others ? ` | ${r.others} not applicants` : ""} | ${c.subject}`.slice(0, 480) });
+  await getRepository().logEvent({ at: c.createdAt, applicationId: "-", actor, action: "EMAIL_CAMPAIGN_CREATED", detail: `${c.campaignId} | ${c.audience}${r.others ? ` | ${r.others} not applicants` : ""}${att.list.length ? ` | ${att.list.length} attachment(s)` : ""} | ${c.subject}`.slice(0, 480) });
   return { ok: true, status: 200, data: { campaign: view(c, []) } };
 }
-const splitBody = (body: string) => (body.startsWith("#") ? { heading: body.slice(1, body.indexOf("\n") === -1 ? undefined : body.indexOf("\n")), body: body.indexOf("\n") === -1 ? "" : body.slice(body.indexOf("\n") + 1) } : { heading: "", body });
+/**
+ * Stored body:  [[attachments:<json>]]\n   (only when files are attached)
+ *               #<heading>\n               (only when a heading is set)
+ *               <message>
+ */
+type StoredFile = Pick<AttachmentInfo, "id" | "name" | "bytes">;
+const ATT_LINE = /^\[\[attachments:(.*)\]\]$/;
+function packBody(heading: string, body: string, files: AttachmentInfo[]) {
+  const head = files.length ? `[[attachments:${JSON.stringify(files.map(({ id, name, bytes }) => ({ id, name, bytes })))}]]\n` : "";
+  return head + (heading ? `#${heading}\n${body}` : body);
+}
+export function splitBody(stored: string): { heading: string; body: string; files: StoredFile[] } {
+  let files: StoredFile[] = [], body = stored;
+  const nl = body.indexOf("\n"), m = ATT_LINE.exec(nl === -1 ? body : body.slice(0, nl));
+  if (m) {
+    try { const j = JSON.parse(m[1]); if (Array.isArray(j)) files = j.filter((f) => f && ATTACHMENT_ID.test(String(f.id))).map((f) => ({ id: String(f.id), name: String(f.name ?? "attachment"), bytes: Number(f.bytes) || 0 })); } catch { /* not ours: leave the body as written */ }
+    if (files.length) body = nl === -1 ? "" : body.slice(nl + 1);
+  }
+  if (!body.startsWith("#")) return { heading: "", body, files };
+  const i = body.indexOf("\n");
+  return { heading: body.slice(1, i === -1 ? undefined : i), body: i === -1 ? "" : body.slice(i + 1), files };
+}
 const keyOfStored = (s: string) => (s.startsWith("ext:") ? `ext:${s.slice(4).split("|")[0].trim().toLowerCase()}` : s);
 
 // ───────────── progress ─────────────
-export interface CampaignView { campaignId: string; createdAt: string; createdBy: string; subject: string; audience: string; total: number; sent: number; failed: number; remaining: number; cancelled: boolean; lastErrors: string[] }
+export interface CampaignView { campaignId: string; createdAt: string; createdBy: string; subject: string; audience: string; attachments: string[]; total: number; sent: number; failed: number; remaining: number; cancelled: boolean; lastErrors: string[] }
 function view(c: EmailCampaign, log: EmailLogRow[]): CampaignView {
   const mine = log.filter((l) => l.campaignId === c.campaignId);
   const sent = new Set(mine.filter((l) => l.status === "SENT").map(logKey));
   const failedIds = new Set(mine.filter((l) => l.status === "FAILED" && !sent.has(logKey(l))).map(logKey));
-  return { campaignId: c.campaignId, createdAt: c.createdAt, createdBy: c.createdBy, subject: c.subject, audience: c.audience, total: c.recipientIds.length,
+  return { campaignId: c.campaignId, createdAt: c.createdAt, createdBy: c.createdBy, subject: c.subject, audience: c.audience, attachments: splitBody(c.body).files.map((f) => f.name), total: c.recipientIds.length,
     sent: sent.size, failed: failedIds.size, remaining: c.recipientIds.map(keyOfStored).filter((k) => !sent.has(k) && !gaveUp(mine, k)).length,
     cancelled: mine.some((l) => l.status === "CANCELLED"), lastErrors: [...new Set(mine.filter((l) => l.status === "FAILED").slice(-5).map((l) => l.detail.slice(0, 120)))] };
 }
@@ -234,13 +275,19 @@ export async function sendBatch(campaignId: string, actor: string): Promise<Serv
     if (!todo.length) return { ok: true, status: 200, data: { done: true, progress: view(c, log) } };
     if (left <= 0) return { ok: true, status: 200, data: { done: false, stopped: "DAILY_LIMIT", progress: view(c, log) } };
 
+    const { heading, body, files: attached } = splitBody(c.body);
+    const { files, missing } = await loadAttachments(attached.map((f) => f.id));
+    // Never send without the promised file: stop, log nothing, and say why.
+    if (missing.length) return { ok: true, status: 200, data: { done: false, stopped: "ATTACHMENT_MISSING", progress: view(c, log) } };
     const { apps } = await rankedData();
-    const { heading, body } = splitBody(c.body);
+    // Big files take longer to send: fewer emails per request so each request finishes in time (about 20 MB each).
+    const bytes = files.reduce((n, f) => n + f.content.length, 0);
+    const batch = bytes ? Math.max(1, Math.min(BATCH, Math.floor((20 * 1048576) / bytes))) : BATCH;
     const rows: EmailLogRow[] = []; let stopped: string | null = null;
-    for (const stored of todo.slice(0, Math.min(BATCH, left))) {
+    for (const stored of todo.slice(0, Math.min(batch, left))) {
       const who = fromStored(stored, apps);
       if (!who) { rows.push({ at: now(), campaignId, applicationId: stored, email: "", status: "FAILED", detail: "BAD_ADDRESS: application not found" }); continue; }
-      const r = await sendEmail(render({ subject: c.subject, heading, body }, who, `${campaignId}-${who.key}`));
+      const r = await sendEmail({ ...render({ subject: c.subject, heading, body, attachments: [] }, who, `${campaignId}-${who.key}`), attachments: files });
       rows.push({ at: now(), campaignId, applicationId: who.applicationId ?? "EXTERNAL", email: who.email, status: r.ok ? "SENT" : "FAILED", detail: r.ok ? (r.id ?? "") : r.reason });
       if (!r.ok && /DAILY_LIMIT|LOGIN_REJECTED|DOMAIN_NOT_VERIFIED|EMAIL_OFF/.test(r.reason)) { stopped = r.reason.split(":")[0]; break; }
       if (emailProvider() === "gmail") await new Promise((res) => setTimeout(res, 700));   // be gentle with Gmail

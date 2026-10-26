@@ -11,7 +11,7 @@ import { PROGRAMME } from "@/config/programme";
  * Never throws: a failed email must never fail an application.
  */
 export type EmailProvider = "resend" | "gmail" | "off";
-export interface EmailMessage { to: string; subject: string; html: string; text: string; idempotencyKey?: string }
+export interface EmailMessage { to: string; subject: string; html: string; text: string; idempotencyKey?: string; attachments?: Array<{ filename: string; content: Buffer; contentType: string }> }
 export type SendResult = { ok: true; provider: EmailProvider; id?: string } | { ok: false; provider: EmailProvider; reason: string };
 
 export function emailProvider(): EmailProvider {
@@ -37,12 +37,15 @@ export async function sendEmail(m: EmailMessage): Promise<SendResult> {
   if (provider === "off") return { ok: false, provider, reason: "EMAIL_OFF" };
   if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(m.to)) return { ok: false, provider, reason: "BAD_ADDRESS" };
   const subject = oneLine(m.subject);
+  const files = m.attachments ?? [];
+  const slow = files.length > 0;   // a file can take a while to upload on a slow connection
   try {
     if (provider === "resend") {
       const res = await fetch("https://api.resend.com/emails", {
-        method: "POST", signal: AbortSignal.timeout(10_000),
+        method: "POST", signal: AbortSignal.timeout(slow ? 90_000 : 10_000),
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json", ...(m.idempotencyKey ? { "Idempotency-Key": m.idempotencyKey } : {}) },
-        body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [m.to], reply_to: replyTo(), subject, html: m.html, text: m.text }),
+        body: JSON.stringify({ from: process.env.EMAIL_FROM, to: [m.to], reply_to: replyTo(), subject, html: m.html, text: m.text,
+          ...(slow ? { attachments: files.map((f) => ({ filename: f.filename, content: f.content.toString("base64"), content_type: f.contentType })) } : {}) }),
       });
       const body = await res.json().catch(() => ({}));
       if (res.ok) return { ok: true, provider, id: body?.id };
@@ -52,10 +55,11 @@ export async function sendEmail(m: EmailMessage): Promise<SendResult> {
     const nodemailer = await import("nodemailer");
     const transport = nodemailer.createTransport({
       service: "gmail", auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD!.replace(/\s/g, "") },
-      connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 15_000,
+      connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: slow ? 60_000 : 15_000,
     });
     const info = await transport.sendMail({
       from: { name: PROGRAMME.shortName, address: process.env.GMAIL_USER! }, to: m.to, replyTo: replyTo(), subject, html: m.html, text: m.text,
+      ...(slow ? { attachments: files.map((f) => ({ filename: f.filename, content: f.content, contentType: f.contentType })) } : {}),
     });
     return { ok: true, provider, id: info.messageId };
   } catch (e) {

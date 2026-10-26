@@ -15,7 +15,8 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     if (!sameOrigin(req)) return NextResponse.json({ message: "This request was not allowed." }, { status: 403 });
-    const rl = await rateLimit(`upload:${clientIp(req)}`, 25, 10 * 60_000);
+    // Generous per address (mobile networks put many people behind one IP); Level 2 is also limited per applicant below.
+    const rl = await rateLimit(`upload:${clientIp(req)}`, 60, 10 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfter);
     const declared = Number(req.headers.get("content-length") || 0);
     if (declared > MAX_BYTES() + 64 * 1024) return NextResponse.json({ message: "That file is too large." }, { status: 413 });
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
       const pass = level2Pass(form?.get("pass"));
       if (!pass) return NextResponse.json({ message: "Your session has expired. Please start again with your Level 1 code and email." }, { status: 401 });
       owner = pass.code;
+      const per = await rateLimit(`upload:l2:${pass.code}`, 30, 10 * 60_000);
+      if (!per.ok) return tooMany(per.retryAfter);
     }
     if (scope === "applicant" && getWindowStatus() !== "OPEN") return NextResponse.json({ message: "Applications are not open, so files cannot be uploaded." }, { status: 403 });
 

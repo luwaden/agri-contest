@@ -1,9 +1,10 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Campaign = { campaignId: string; createdAt: string; createdBy: string; subject: string; audience: string; total: number; sent: number; failed: number; remaining: number; cancelled: boolean; lastErrors: string[] };
+type Campaign = { campaignId: string; createdAt: string; createdBy: string; subject: string; audience: string; attachments?: string[]; total: number; sent: number; failed: number; remaining: number; cancelled: boolean; lastErrors: string[] };
 type Overview = { campaigns: Campaign[]; sentToday: number; dailyLimit: number; sender: "gmail" | "resend" | "off"; senderProblem: string | null; from: string };
-type Preview = { count: number; others: number; warnings: string[]; label: string; notFound: string[]; sample: Array<{ applicationId: string; name: string; email: string }>; email: { subject: string; html: string; text: string; to: string } | null };
+type Attachment = { id: string; name: string; bytes: number };
+type Preview = { attachments?: Attachment[]; count: number; others: number; warnings: string[]; label: string; notFound: string[]; sample: Array<{ applicationId: string; name: string; email: string }>; email: { subject: string; html: string; text: string; to: string } | null };
 
 const AUDIENCES = [
   ["passed", "Passed by reviewers"], ["batch", "Everyone with a screening reviewer"], ["judges", "Everyone with judges"],
@@ -19,7 +20,10 @@ const STOP: Record<string, string> = {
   GMAIL_LOGIN_REJECTED: "Gmail refused the login. Check GMAIL_USER and GMAIL_APP_PASSWORD on the server.",
   DOMAIN_NOT_VERIFIED: "The sending domain is not verified with Resend.",
   CANCELLED: "This message was cancelled.",
+  ATTACHMENT_MISSING: "An attached file is no longer on the server, so nothing was sent. Cancel this message and send it again with the file attached.",
 };
+const ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.pptx,.xlsx";
+const size = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
 async function api<T>(body?: Record<string, unknown>): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   try {
@@ -41,11 +45,14 @@ export function Messages({ initial }: { initial: Overview }) {
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
   const [stopNote, setStopNote] = useState<Record<string, string>>({});
-  const bodyRef = useRef<HTMLTextAreaElement>(null); const stopFlag = useRef(false);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState<string[]>([]);
+  const [fileError, setFileError] = useState("");
+  const bodyRef = useRef<HTMLTextAreaElement>(null); const stopFlag = useRef(false); const fileInput = useRef<HTMLInputElement>(null);
 
   const audience = () => (kind === "finalists" || kind === "top" ? { kind, n } : kind === "status" ? { kind, status } : kind === "pasted" ? { kind, text: pasted }
     : kind === "staff" ? { kind, role: staffRole } : kind === "mentors" ? { kind, status: mentorStatus } : { kind });
-  const message = () => ({ subject, heading, body, audience: audience() });
+  const message = () => ({ subject, heading, body, audience: audience(), attachments: files.map((f) => f.id) });
   const changed = () => { setPv(null); setConfirming(false); };
   const refresh = useCallback(async () => { const r = await api<Overview>(); if (r.ok) setOv(r.data); }, []);
 
@@ -55,8 +62,28 @@ export function Messages({ initial }: { initial: Overview }) {
     setBusy(true); setMsg(null);
     const r = await api<{ campaign: Campaign }>({ action: "create", ...message() }); setBusy(false);
     if (!r.ok) { setMsg({ tone: "err", text: r.error }); return; }
-    setPv(null); setConfirming(false); setSubject(""); setHeading(""); setBody("Dear {first_name},\n\n");
+    setPv(null); setConfirming(false); setSubject(""); setHeading(""); setBody("Dear {first_name},\n\n"); setFiles([]);
     await refresh(); run(r.data.campaign.campaignId);
+  }
+
+  /** Each file is uploaded on its own as soon as it is chosen; the message keeps only the returned ids. */
+  async function attach(list: FileList | null) {
+    if (!list?.length) return;
+    setFileError(""); changed();
+    let count = files.length;
+    for (const f of Array.from(list)) {
+      if (count >= 5) { setFileError("At most 5 attachments."); break; }
+      setUploading((u) => [...u, f.name]);
+      try {
+        const fd = new FormData(); fd.set("file", f);
+        const res = await fetch("/api/admin/messages/attachments", { method: "POST", body: fd });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) setFileError(`${f.name}: ${d.message ?? `the server answered ${res.status}.`}`);
+        else { count++; setFiles((x) => [...x, { id: d.id, name: d.name, bytes: d.bytes }]); }
+      } catch { setFileError(`${f.name}: could not reach the server.`); }
+      finally { setUploading((u) => { const i = u.indexOf(f.name); return i === -1 ? u : [...u.slice(0, i), ...u.slice(i + 1)]; }); }
+    }
+    if (fileInput.current) fileInput.current.value = "";
   }
 
   async function run(id: string) {
@@ -120,8 +147,22 @@ export function Messages({ initial }: { initial: Overview }) {
           <textarea id="msg-body" ref={bodyRef} rows={10} value={body} maxLength={8000} onChange={(e) => { setBody(e.target.value); changed(); }} className={`${input} leading-relaxed`} />
           <p className="mt-1 text-xs text-ink-muted">Plain text. Leave a blank line between paragraphs. The reference number is shown in every email automatically. Links can push mail into Spam; use them sparingly.</p>
         </div>
+        <div>
+          <p className="text-sm font-semibold">Attachments <span className="font-normal text-ink-muted">(optional; up to 5 files, 10 MB in total; PDF, Word, PowerPoint, Excel or images)</span></p>
+          {files.length > 0 && <ul className="mt-2 divide-y divide-paper-line rounded-md border border-paper-line">
+            {files.map((f) => <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <span className="min-w-0 truncate"><span className="font-medium">{f.name}</span> <span className="text-ink-muted tabular-nums">· {size(f.bytes)}</span></span>
+              <button type="button" onClick={() => { setFiles((x) => x.filter((y) => y.id !== f.id)); changed(); }} className="shrink-0 text-sm font-semibold text-danger-fg hover:underline" aria-label={`Remove ${f.name}`}>Remove</button></li>)}
+          </ul>}
+          {uploading.length > 0 && <p role="status" className="mt-2 text-sm text-ink-soft">Uploading {uploading.join(", ")}…</p>}
+          <input ref={fileInput} id="msg-files" type="file" multiple accept={ACCEPT} className="sr-only" onChange={(e) => void attach(e.target.files)} />
+          <label htmlFor="msg-files" className={`mt-2 inline-flex cursor-pointer items-center rounded-full border border-paper-line px-4 py-1.5 text-sm font-semibold hover:border-primary hover:text-primary focus-within:ring-2 focus-within:ring-primary/30 ${files.length >= 5 || uploading.length ? "pointer-events-none opacity-50" : ""}`}>
+            {files.length ? "Attach another file" : "Attach a file"}</label>
+          {fileError && <p role="alert" className="mt-1 text-sm font-medium text-danger-fg">{fileError}</p>}
+          {files.length > 0 && <p className="mt-1 text-xs text-ink-muted">Every recipient gets the same files. Large files are sent more slowly, and Gmail counts each copy against its daily limit.</p>}
+        </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" disabled={busy || !subject || body.trim().length < 10} onClick={doPreview} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy && !pv ? "Working…" : "Preview"}</button>
+          <button type="button" disabled={busy || uploading.length > 0 || !subject || body.trim().length < 10} onClick={doPreview} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy && !pv ? "Working…" : "Preview"}</button>
           {pv && <button type="button" disabled={busy || off} onClick={doTest} className="rounded-full border border-primary px-5 py-2.5 text-sm font-semibold text-primary disabled:opacity-50">Send a test to me</button>}
         </div>
         {msg && <p role={msg.tone === "err" ? "alert" : "status"} className={`rounded-md px-3 py-2 text-sm font-semibold ${msg.tone === "err" ? "bg-danger-bg text-danger-fg" : "bg-lime/40 text-night"}`}>{msg.text}</p>}
@@ -135,6 +176,7 @@ export function Messages({ initial }: { initial: Overview }) {
             {pv.count > 0 && <>
               <details className="text-sm"><summary className="cursor-pointer font-semibold">First {pv.sample.length} recipients</summary><ul className="mt-1 space-y-0.5">{pv.sample.map((s) => <li key={s.applicationId} className="flex flex-wrap gap-x-3"><span className="font-mono text-xs text-ink-muted">{s.applicationId}</span><span>{s.name}</span><span className="text-ink-muted">{s.email}</span></li>)}</ul></details>
               {pv.email && <div><p className="text-sm"><span className="text-ink-muted">To</span> {pv.email.to} · <span className="text-ink-muted">Subject</span> <strong>{pv.email.subject}</strong></p>
+                {!!pv.attachments?.length && <p className="mt-1 text-sm"><span className="text-ink-muted">Attached</span> {pv.attachments.map((a) => `${a.name} (${size(a.bytes)})`).join(", ")}</p>}
                 <iframe title="Email preview" sandbox="" srcDoc={pv.email.html} className="mt-2 h-[460px] w-full rounded-md border border-paper-line bg-white" /></div>}
               {!confirming ? <button type="button" disabled={off} onClick={() => setConfirming(true)} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Send to {pv.count.toLocaleString("en-GB")}…</button>
                 : <div className="rounded-md bg-warn-bg p-3 text-sm text-warn-fg">
@@ -157,7 +199,7 @@ export function Messages({ initial }: { initial: Overview }) {
               return (
                 <li key={c.campaignId} className="space-y-2 px-4 py-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="font-semibold">{c.subject}</p><p className="font-mono text-xs text-ink-muted">{c.campaignId} · {new Date(c.createdAt).toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {c.createdBy}</p></div>
-                  <p className="text-sm text-ink-soft">{c.audience}</p>
+                  <p className="text-sm text-ink-soft">{c.audience}{c.attachments?.length ? ` · Attached: ${c.attachments.join(", ")}` : ""}</p>
                   <div className="flex items-center gap-3 text-sm tabular-nums"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-line"><span className="block h-full bg-primary" style={{ width: `${pct}%` }} /></span>{c.sent} sent{c.failed ? ` · ${c.failed} failed` : ""}{c.remaining ? ` · ${c.remaining} to go` : ""}</div>
                   {stopNote[c.campaignId] && <p className="text-sm text-ink-soft">{stopNote[c.campaignId]}</p>}
                   {c.lastErrors.length > 0 && <details className="text-xs text-danger-fg"><summary className="cursor-pointer">Recent errors</summary><ul className="list-disc pl-5">{c.lastErrors.map((e) => <li key={e}>{e}</li>)}</ul></details>}

@@ -139,3 +139,50 @@ test("any email address can receive a message: pasted contacts, staff and panel 
   const v = (await S.listCampaigns()).campaigns.find((x) => x.campaignId === id)!;
   assert.deepEqual([v.total, v.sent, v.remaining], [5, 5, 0]);
 });
+
+test("attachments: checked on upload, shown in the preview, sent with every email, and never silently dropped", async () => {
+  const S = await import("../lib/services/emailCampaignService");
+  const A = await import("../lib/email/attachments");
+  const pdf = new TextEncoder().encode("%PDF-1.4\n% programme timetable\n%%EOF");
+  const bad = await A.saveAttachment(new TextEncoder().encode("MZ definitely not a pdf"), "timetable.pdf");
+  assert.equal(bad.ok, false, "a renamed file is refused");
+  assert.equal((await A.saveAttachment(pdf, "run.exe")).ok, false, "unknown type refused");
+  const up = await A.saveAttachment(pdf, "Demo Day / Timetable:final.pdf");
+  assert.ok(up.ok); const att = (up as any).data;
+  assert.match(att.id, A.ATTACHMENT_ID); assert.equal(att.name, "Demo Day Timetable final.pdf", "safe file name");
+
+  const withFile = { subject: "Demo day, {first_name}", heading: "Demo day", body: "Dear {first_name},\n\nThe timetable is attached.\n\nThe team", attachments: [att.id] };
+  const audience = { kind: "pasted", text: "Ada <ada@partner.org>\nbayo@partner.org\nchi@partner.org" };
+  const p = await S.preview({ ...withFile, audience });
+  assert.ok(p.ok); assert.deepEqual((p as any).data.attachments.map((x: any) => x.name), ["Demo Day Timetable final.pdf"]);
+  assert.equal((await S.preview({ ...withFile, attachments: ["ATT-" + "0".repeat(24)], audience })).status, 422, "a missing file is refused before sending");
+
+  sent.length = 0;
+  const t = await S.sendTest({ ...withFile, audience }, "boss@example.org"); assert.ok(t.ok);
+  assert.equal((sent[0] as any).attachments?.[0]?.filename, "Demo Day Timetable final.pdf", "the test carries the file too");
+
+  sent.length = 0;
+  const c = await S.createCampaign({ ...withFile, audience }, "admin@example.org"); assert.ok(c.ok);
+  const camp = (c as any).data.campaign; assert.deepEqual(camp.attachments, ["Demo Day Timetable final.pdf"]);
+  const r = await S.sendBatch(camp.campaignId, "admin@example.org"); assert.equal((r as any).data.done, true);
+  assert.equal(sent.length, 3);
+  for (const m of sent as any[]) {
+    assert.equal(m.attachments.length, 1);
+    assert.deepEqual(new Uint8Array(Buffer.from(m.attachments[0].content, "base64")), pdf, "file arrives intact");
+    assert.match(m.subject, /^Demo day, /); assert.ok(!m.html.includes("[[attachments"), "the stored file list never leaks into the email");
+  }
+  const listed = (await S.listCampaigns()).campaigns.find((x) => x.campaignId === camp.campaignId)!;
+  assert.deepEqual(listed.attachments, ["Demo Day Timetable final.pdf"]);
+
+  // The file disappears before a later batch: stop, send nothing, log nothing.
+  const c2 = await S.createCampaign({ ...withFile, audience: { kind: "pasted", text: "dee@partner.org" } }, "admin@example.org");
+  const { rmSync } = await import("node:fs");
+  rmSync(path.join(".data", "files", "email-attachments", att.id), { recursive: true });
+  sent.length = 0;
+  const r2 = await S.sendBatch((c2 as any).data.campaign.campaignId, "admin@example.org");
+  assert.equal((r2 as any).data.stopped, "ATTACHMENT_MISSING"); assert.equal(sent.length, 0);
+
+  // Old messages without files still read correctly.
+  assert.deepEqual(S.splitBody("#Heading\nHello"), { heading: "Heading", body: "Hello", files: [] });
+  assert.deepEqual(S.splitBody("[[not ours]]\nHello"), { heading: "", body: "[[not ours]]\nHello", files: [] });
+});

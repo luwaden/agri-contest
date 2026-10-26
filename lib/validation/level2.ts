@@ -10,7 +10,10 @@ const pick = <T extends readonly { value: string }[]>(l: T, message: string) => 
 const yesNo = (message: string) => pick(YES_NO, message);
 const count = (label: string, max = 1_000_000) => z.preprocess((v) => (typeof v === "number" ? String(v) : typeof v === "string" ? v.replace(/[,\s]/g, "") : ""),
   z.string().min(1, `Please enter ${label}. Use 0 if none.`).regex(/^\d{1,7}$/, `Please enter a whole number for ${label}.`).refine((s) => Number(s) <= max, "That number looks too large."));
-const url = (label: string) => z.preprocess((v) => clean(v) ?? "", z.string().max(500).refine((s) => s === "" || /^https:\/\/\S+$/i.test(s), `Please upload the ${label}, or paste a link that starts with https://.`)).default("");
+/** A file uploaded to this server when Cloudinary is not used (see lib/files/localStore.ts). */
+export const STORED_L2_FILE = /^stored:level-2\/(AGRA-\d{4}-[A-Z0-9]{6})\/[A-Za-z0-9_-]+\.[a-z0-9]{1,5}$/;
+const url = (label: string) => z.preprocess((v) => clean(v) ?? "", z.string().max(500).refine((s) => s === "" || /^https:\/\/\S+$/i.test(s) || STORED_L2_FILE.test(s), `Please upload the ${label}, or paste a link that starts with https://.`)).default("");
+export const L2_DOC_FIELDS = ["doc1", "doc2", "doc3", "smedanCertificate", "cacCertificate", "bankProof"] as const;
 
 export const level2Schema = z.object({
   // About the business and its owner

@@ -1,4 +1,4 @@
 /** Bump on each release. Shown by /api/health and the System check page so you can see which code is live. */
-export const APP_VERSION = "2026.10.23";
+export const APP_VERSION = "2026.10.26";
 export const FEATURES = ["redis", "store-check", "system-check", "assistant-staff", "password-reset", "reviewer-role", "staff-in-sheet", "check-live", "emails", "judging", "screening", "ai-data-desk", "messages", "level-2"] as const;
 export const commit = () => (process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || "").slice(0, 7) || "local";
