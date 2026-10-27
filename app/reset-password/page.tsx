@@ -2,15 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
-import { peekResetToken } from "@/lib/auth/passwords";
-import { findStaff } from "@/lib/auth/users";
+import { findStaff, peekPasswordLink } from "@/lib/auth/users";
 
 export const metadata: Metadata = { title: "Set your password", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token = "" } = await searchParams;
-  const link = token ? await peekResetToken(token) : null;
+  const link = token ? await peekPasswordLink(token) : null;
   const person = link ? await findStaff(link.email).catch(() => null) : null;
   const invite = link?.purpose === "invite";
   return (

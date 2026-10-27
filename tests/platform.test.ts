@@ -253,7 +253,11 @@ test("password rules", () => {
   assert.ok(passwordProblem("ada.obi-2026-x", "ada.obi@example.org")); assert.equal(passwordProblem("green maize fields at dawn"), null);
 });
 test("reset link: works once, sets a new password, rejects reuse and bad tokens", async () => {
+  process.env.SESSION_SECRET ||= "t".repeat(40);   // links are signed with SESSION_SECRET (no Redis needed)
   const { token, expiresAt } = await createResetToken("Reviewer@Example.org");
+  const [payload, sig] = token.split(".");
+  const edited = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, "base64url").toString()), e: "admin@example.org" })).toString("base64url");
+  assert.equal((await consumeResetToken(`${edited}.${sig}`, "green maize fields at dawn")).ok, false);   // edited link refused
   assert.ok(token.length >= 40 && Date.parse(expiresAt) > Date.now());
   assert.equal((await consumeResetToken(token, "short")).ok, false);                       // weak password: link stays valid
   const r = await consumeResetToken(token, "green maize fields at dawn"); assert.equal(r.ok, true); if (r.ok) assert.equal(r.email, "reviewer@example.org");

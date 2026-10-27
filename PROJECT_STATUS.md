@@ -83,11 +83,12 @@ No credentials in frontend code; no plaintext passwords. The AI never writes to 
 3. Commit with named paths, push, and choose a host (then `check:live`).
 4. Decide: PostgreSQL move vs Sheets quick wins; Level 2 access rule; email domain.
 
-## 11. Additions 26–27 Oct 2026 (agri-update-16-all.zip = everything since GitHub main 2243297)
+## 11. Additions 26–27 Oct 2026 (agri-update-17-all.zip = everything since GitHub main 2243297)
 - **Messages attachments** (≤5 files, 10 MB total; stored on server disk `.data/files/email-attachments`; NOT possible on Vercel's read-only disk). [VERIFIED tests]
 - **Level 2 uploads**: upload-first field (progress, replace/remove, photo shrink, HEIC message, error codes). Cloudinary when configured, else server disk (`stored:` refs). [VERIFIED browser]
 - **Level 2 detail page** `/admin/level-2/[code]`: answers, labelled documents, Open via `/api/admin/files` (logged with the code), review result. [VERIFIED browser]
 - **Admin → Settings** (ADMIN only): 10 feature switches in `config/features.ts`, stored in the existing **Configuration** tab (`feature.<key> | on/off`, newest row wins), 20 s cache, enforced on the server. [VERIFIED tests + browser]
 - **Level 2 reviews**: new tab **"Level 2 Reviews"** (needs `npm run setup:sheets` once). Admin/Coordinator: `/admin/level-2/reviews` share evenly (states mixed) → move / remove / reopen, CSV. Reviewers/Judges: `/review/level-2` list and `/review/level-2/[code]` (5 questions 1–5, total /25, Recommend / Do not recommend, comment; no contact details shown). One live review per applicant. Switch `level2Scoring`. [VERIFIED tests + browser]
 - [USER-REPORTED 26 Oct] Live on Vercel at www.youthagriinnovate.ng. Upload failure cause: `CLOUDINARY_CLOUD_NAME=Agra_Root` is wrong (must be the cloud name from the Cloudinary dashboard). Upstash URL in Vercel probably wrapped in quotes.
-- Version 2026.10.27. Tests: 128 passing.
+- **Staff from panel applications** (Admin → Staff): tick panel applicants, pick Reviewer/Judge, "Create accounts" → account + emailed invite link + application ACCEPTED. Password links are now SIGNED with SESSION_SECRET (no Redis needed); single use via a fingerprint of the current password; invite 7 days, reset 60 min. [VERIFIED tests + browser]
+- Version 2026.10.27.2. Tests: 131 passing.

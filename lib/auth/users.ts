@@ -4,8 +4,8 @@ import bcrypt from "bcryptjs";
 import type { SessionUser, StaffRole } from "@/types/user";
 import type { StaffAccount, StaffSummary } from "@/types/staff";
 import { getRepository } from "@/lib/repository";
-import { kv } from "@/lib/kv";
-import { consumeResetToken, getPasswordOverride, revokeSessions } from "./passwords";
+import { kv, redisConfigured } from "@/lib/kv";
+import { consumeResetToken, createResetToken, getPasswordOverride, peekResetToken, revokeSessions, type LinkPurpose } from "./passwords";
 
 /**
  * STAFF ACCOUNTS come from two places:
@@ -131,10 +131,19 @@ export async function refreshSessionUser(u: SessionUser): Promise<SessionUser | 
 }
 
 /** Uses a one-time link to set a password, storing it where the account lives. */
+/** The password hash that is in force for this person right now (what one-time links are checked against). */
+export const currentHash = async (email: string) => {
+  const acct = await findStaff(email, true);
+  return (acct ? (await getPasswordOverride(acct.email)) ?? acct.passwordHash : "") || "";
+};
+export const createPasswordLink = (email: string, purpose: LinkPurpose) => createResetToken(email, purpose, currentHash);
+export const peekPasswordLink = (token: string) => peekResetToken(token, currentHash);
+
 export async function completePasswordLink(token: string, newPassword: string) {
   return consumeResetToken(token, newPassword, async (email, hash) => {
     const acct = await findStaff(email, true);
     if (!acct) throw new Error("NO_ACCOUNT");
+    if (acct.source === "env" && !redisConfigured()) throw new Error("ENV_NEEDS_REDIS");
     if (acct.source === "sheet") {
       const updated = await getRepository().updateStaff(email, { passwordHash: hash });
       if (!updated) throw new Error("NO_ACCOUNT");
@@ -143,7 +152,7 @@ export async function completePasswordLink(token: string, newPassword: string) {
       await kv.set(`pw:${email}`, hash);       // env accounts cannot be edited at runtime, so the new hash lives in Redis
     }
     invalidateStaffCache();
-  });
+  }, currentHash);
 }
 
 export const newUserId = () => `U-${randomBytes(4).toString("hex").toUpperCase()}`;

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { roleLabel } from "@/lib/auth/permissions";
 import type { StaffRole } from "@/types/user";
 import type { StaffSummary } from "@/types/staff";
@@ -9,21 +9,24 @@ const STATUS: Record<StaffSummary["status"], [string, string]> = {
   active: ["Active", "bg-lime text-night"], invited: ["Invited: no password yet", "bg-sun text-night"],
   deactivated: ["Deactivated", "bg-neutral-200 text-ink-soft"], damaged: ["Password damaged: send a reset link", "bg-danger-bg text-danger-fg"],
 };
-type Link = { link: string; expiresAt: string; label: string };
+type Link = { link: string; expiresAt: string; label: string; emailed?: boolean; problem?: string; to?: string };
 
 function LinkBox({ l, onCopy, copied }: { l: Link; onCopy: () => void; copied: boolean }) {
   return (
     <div className="space-y-1.5" role="status">
+      {l.emailed ? <p className="text-xs font-semibold text-primary">✓ Emailed to {l.to}. They open it and choose their password.</p>
+        : l.problem ? <p className="text-xs font-semibold text-warn-fg">{l.problem}</p> : null}
       <p className="text-xs font-semibold text-primary">{l.label}</p>
       <input readOnly value={l.link} aria-label={l.label} className="w-full rounded-md border border-paper-line bg-paper-warm px-2 py-1.5 font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
       <div className="flex flex-wrap items-center gap-3 text-xs"><button type="button" className="font-bold text-azure underline" onClick={onCopy}>{copied ? "Copied" : "Copy link"}</button>
-        <span className="text-ink-muted">Works once · expires {new Date(l.expiresAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Send it privately (WhatsApp, SMS or email).</span></div>
+        <span className="text-ink-muted">Works once · expires {new Date(l.expiresAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. {l.emailed ? "You can also send it another way." : "Send it privately (WhatsApp, SMS or email)."}</span></div>
     </div>
   );
 }
 
 export function StaffTable({ staff: initial, linksOn, me }: { staff: StaffSummary[]; linksOn: boolean; me: string }) {
   const [staff, setStaff] = useState(initial);
+  useEffect(() => setStaff(initial), [initial]);   // refreshed after accounts are added from panel applications
   const [links, setLinks] = useState<Record<string, Link | string>>({});
   const [copied, setCopied] = useState(""); const [busy, setBusy] = useState(""); const [msg, setMsg] = useState("");
   const [added, setAdded] = useState<Link | null>(null);
@@ -37,8 +40,8 @@ export function StaffTable({ staff: initial, linksOn, me }: { staff: StaffSummar
     e.preventDefault(); const form = e.currentTarget; const f = new FormData(form);
     setBusy("add"); setMsg(""); setAdded(null);
     try {
-      const d = await call("POST", "/api/admin/staff", { name: f.get("name"), email: f.get("email"), role: f.get("role") });
-      setStaff(d.staff); setAdded({ link: d.link, expiresAt: d.expiresAt, label: `Invite link for ${f.get("name")}: they open it and choose their password` }); form.reset();
+      const d = await call("POST", "/api/admin/staff", { name: f.get("name"), email: f.get("email"), role: f.get("role"), send: f.get("send") === "on" });
+      setStaff(d.staff); setAdded({ link: d.link, expiresAt: d.expiresAt, label: `Invite link for ${f.get("name")}`, emailed: d.emailed, problem: d.emailProblem, to: String(f.get("email")) }); form.reset();
     } catch (err) { setMsg((err as Error).message); } finally { setBusy(""); }
   }
   async function change(email: string, patch: { role?: StaffRole; active?: boolean }) {
@@ -47,8 +50,8 @@ export function StaffTable({ staff: initial, linksOn, me }: { staff: StaffSummar
     catch (err) { setMsg((err as Error).message); } finally { setBusy(""); }
   }
   async function makeLink(u: StaffSummary) {
-    setLinks((l) => ({ ...l, [u.email]: "Creating…" }));
-    try { const d = await call("POST", "/api/admin/password-reset", { email: u.email }); setLinks((l) => ({ ...l, [u.email]: { link: d.link, expiresAt: d.expiresAt, label: d.purpose === "invite" ? "Invite link (choose a password)" : "Reset link" } })); }
+    setLinks((l) => ({ ...l, [u.email]: "Sending…" }));
+    try { const d = await call("POST", "/api/admin/password-reset", { email: u.email, send: true }); setLinks((l) => ({ ...l, [u.email]: { link: d.link, expiresAt: d.expiresAt, label: d.purpose === "invite" ? "Invite link (choose a password)" : "Reset link", emailed: d.emailed, problem: d.emailProblem, to: u.email } })); }
     catch (err) { setLinks((l) => ({ ...l, [u.email]: (err as Error).message })); }
   }
   const copy = async (key: string, text: string) => { await navigator.clipboard.writeText(text).catch(() => {}); setCopied(key); };
@@ -56,16 +59,17 @@ export function StaffTable({ staff: initial, linksOn, me }: { staff: StaffSummar
 
   return (
     <div className="space-y-6">
-      {!linksOn && <p role="status" className="rounded-card border border-warn-line bg-warn-bg p-4 text-sm font-medium text-warn-fg">Invite and reset links need Redis (Upstash). Add UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN on Vercel and redeploy. Until then, add people with <code>npm run make-user</code>.</p>}
+      {!linksOn && <p role="status" className="rounded-card border border-warn-line bg-warn-bg p-4 text-sm font-medium text-warn-fg">Invite and reset links need SESSION_SECRET (32+ characters) in the server settings.</p>}
 
       <section aria-labelledby="add-h" className="rounded-card border border-paper-line bg-white p-5 sm:p-6">
         <h2 id="add-h" className="font-display text-xl text-primary">Add a person</h2>
-        <p className="mt-1 text-sm text-ink-soft">They are saved in the <strong>Admin Users</strong> tab of the Google Sheet. You get a link to send them; they choose their own password. No redeploy needed.</p>
+        <p className="mt-1 text-sm text-ink-soft">For someone who did not apply through the panel form. They get an email with a link to choose their own password.</p>
         <form onSubmit={add} className="mt-4 grid gap-3 sm:grid-cols-[1.2fr_1.4fr_1fr_auto] sm:items-end">
           <label className="text-sm font-medium">Full name<input name="name" required maxLength={80} autoComplete="off" className={input} /></label>
           <label className="text-sm font-medium">Email<input name="email" type="email" required autoComplete="off" className={input} /></label>
           <label className="text-sm font-medium">Role<select name="role" required defaultValue="REVIEWER" className={input}>{ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}</select></label>
-          <button type="submit" disabled={!linksOn || busy === "add"} className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary-800 disabled:opacity-40">{busy === "add" ? "Adding…" : "Add and get link"}</button>
+          <button type="submit" disabled={!linksOn || busy === "add"} className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary-800 disabled:opacity-40">{busy === "add" ? "Adding…" : "Add and email invite"}</button>
+          <label className="flex items-center gap-2 text-sm sm:col-span-4"><input type="checkbox" name="send" defaultChecked className="h-4 w-4 accent-leaf-700" /> Email the invite link to them (untick to copy the link and send it yourself)</label>
         </form>
         {added && <div className="mt-4"><LinkBox l={added} copied={copied === "added"} onCopy={() => copy("added", added.link)} /></div>}
       </section>
@@ -90,7 +94,7 @@ export function StaffTable({ staff: initial, linksOn, me }: { staff: StaffSummar
                     {typeof l === "object" ? <LinkBox l={l} copied={copied === u.email} onCopy={() => copy(u.email, l.link)} />
                       : typeof l === "string" ? <span className="text-xs text-ink-muted" role="status">{l}</span>
                       : u.status === "deactivated" ? <span className="text-xs text-ink-muted">Reactivate first</span>
-                      : <button type="button" disabled={!linksOn} onClick={() => makeLink(u)} className="rounded-full border-2 border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-white disabled:opacity-40">{u.status === "invited" ? "New invite link" : "Create reset link"}</button>}
+                      : <button type="button" disabled={!linksOn} onClick={() => makeLink(u)} className="rounded-full border-2 border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-white disabled:opacity-40">{u.status === "invited" ? "Email a new invite" : "Email a reset link"}</button>}
                   </td>
                   <td className="px-4 py-3">{locked ? <span className="text-xs text-ink-muted">{self ? "—" : "Change on Vercel"}</span> :
                     <button type="button" disabled={busy === u.email} onClick={() => change(u.email, { active: !u.active })} className={`rounded-full px-3 py-1.5 text-xs font-bold ${u.active ? "border-2 border-danger-fg/60 text-danger-fg hover:bg-danger-bg" : "border-2 border-primary text-primary hover:bg-primary hover:text-white"}`}>{u.active ? "Deactivate" : "Reactivate"}</button>}</td>
