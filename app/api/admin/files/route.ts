@@ -5,6 +5,7 @@ import { panelMayOpenFile } from "@/lib/services/reviewService";
 import { cloudinaryConfigured, parseCloudinaryUrl, signedDownloadUrl } from "@/lib/cloudinary/client";
 import { getRepository } from "@/lib/repository";
 import { REFERENCE_PATTERN } from "@/lib/reference";
+import { level2ReviewerMayOpen } from "@/lib/services/level2ReviewService";
 import { isStoredRef, readLocal } from "@/lib/files/localStore";
 import { ALLOWED, type AllowedExt } from "@/lib/cloudinary/validate";
 
@@ -18,9 +19,11 @@ export async function GET(req: NextRequest) {
   // Optional: the application the file belongs to, so the audit log says whose file was opened.
   const forApp = req.nextUrl.searchParams.get("for") ?? "";
   const appId = REFERENCE_PATTERN.test(forApp) ? forApp : "-";
-  if (url.startsWith("stored:")) return openStored(url, user.email, can(user.role, "applications:view"), appId);
+  // Staff who see all applications, or a reviewer for a Level 2 applicant assigned to them.
+  const l2Reviewer = can(user.role, "scores:submit") && (await level2ReviewerMayOpen(user, url));
+  if (url.startsWith("stored:")) return openStored(url, user.email, can(user.role, "applications:view") || l2Reviewer, appId);
   // Staff who see every application, or a judge/reviewer for a file of an application assigned to them. Nobody else.
-  if (!can(user.role, "applications:view") && !(can(user.role, "scores:submit") && (await panelMayOpenFile(user, url))))
+  if (!can(user.role, "applications:view") && !l2Reviewer && !(can(user.role, "scores:submit") && (await panelMayOpenFile(user, url))))
     return NextResponse.json({ message: "You do not have permission to open that file." }, { status: 403 });
   const auth = { user };
   const parsed = parseCloudinaryUrl(url);

@@ -42,6 +42,12 @@ export const FEATURES = {
     off: "Score sheets are locked: nothing can be saved, submitted, passed or declared. Use this when a round is closed.",
     default: true,
   },
+  level2Scoring: {
+    group: "Judging and screening", label: "Level 2 reviewers can score",
+    on: "Reviewers can save and submit their Level 2 reviews.",
+    off: "Level 2 reviews are locked: nothing can be saved or submitted. Assigning still works.",
+    default: true,
+  },
   messages: {
     group: "Staff tools", label: "Sending messages",
     on: "Administrators can send messages from Admin → Messages.",

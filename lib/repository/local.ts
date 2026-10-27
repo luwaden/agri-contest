@@ -1,4 +1,4 @@
-import type { Level2Application, Level2Invite } from "@/types/level2";
+import { isLiveL2Review, type Level2Application, type Level2Invite, type Level2Review } from "@/types/level2";
 import type { EmailCampaign, EmailLogRow } from "@/types/email";
 import "server-only";
 import { promises as fs } from "node:fs";
@@ -9,7 +9,7 @@ import type { MentorApplication, MentorStatus } from "@/types/mentor";
 import type { StaffAccount } from "@/types/staff";
 import type { PanelReview } from "@/types/review";
 
-interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[]; campaigns?: EmailCampaign[]; emailLog?: EmailLogRow[]; level2?: Level2Application[]; level2Invites?: Level2Invite[]; configuration?: ConfigRow[] }
+interface Store { applications: Application[]; drafts: DraftRecord[]; events: AuditEvent[]; mentors?: MentorApplication[]; staff?: StaffAccount[]; reviews?: PanelReview[]; campaigns?: EmailCampaign[]; emailLog?: EmailLogRow[]; level2?: Level2Application[]; level2Invites?: Level2Invite[]; configuration?: ConfigRow[]; level2Reviews?: Level2Review[] }
 const FILE = path.join(process.cwd(), ".data", "dev-store.json");
 
 let queue: Promise<unknown> = Promise.resolve();
@@ -103,6 +103,21 @@ export class LocalRepository implements ApplicationRepository {
   getEmailCampaigns = () => serial(async () => (await load()).campaigns ?? []);
   getEmailLog = () => serial(async () => (await load()).emailLog ?? []);
   appendEmailLog = (rows: EmailLogRow[]) => serial(async () => { const s = await load(); (s.emailLog ??= []).push(...rows); await save(s); });
+  getLevel2Reviews = () => serial(async () => (await load()).level2Reviews ?? []);
+  createLevel2Reviews = (rows: Level2Review[]) => serial(async () => {
+    const s = await load(); s.level2Reviews ??= [];
+    const live = new Set(s.level2Reviews.filter(isLiveL2Review).map((r) => r.level1Code)); let n = 0;
+    for (const r of rows) { if (live.has(r.level1Code)) continue; live.add(r.level1Code); s.level2Reviews.push(r); n++; }
+    await save(s); return n;
+  });
+  updateLevel2Reviews = (changes: Array<{ reviewId: string; patch: Partial<Level2Review> }>) => serial(async () => {
+    const s = await load(); const out: Level2Review[] = []; const at = new Date().toISOString();
+    for (const { reviewId, patch } of changes) {
+      const r = (s.level2Reviews ?? []).find((x) => x.reviewId === reviewId); if (!r) continue;
+      Object.assign(r, patch, { reviewId: r.reviewId, level1Code: r.level1Code, reviewerEmail: r.reviewerEmail, updatedAt: patch.updatedAt ?? at }); out.push({ ...r });
+    }
+    await save(s); return out;
+  });
   getConfiguration = () => serial(async () => (await load()).configuration ?? []);
   appendConfiguration = (row: ConfigRow) => serial(async () => { const s = await load(); (s.configuration ??= []).push(row); await save(s); });
   getLevel2Invites = () => serial(async () => (await load()).level2Invites ?? []);

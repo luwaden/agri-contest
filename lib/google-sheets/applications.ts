@@ -9,8 +9,8 @@ import { rowToStaff, staffToRow } from "./staffSchema";
 import { reviewToRow, rowToReview } from "./reviewSchema";
 import type { PanelReview } from "@/types/review";
 import type { EmailCampaign, EmailLogRow } from "@/types/email";
-import type { Level2Application, Level2Invite } from "@/types/level2";
-import { level2ToRow, rowToLevel2 } from "./level2Schema";
+import { isLiveL2Review, type Level2Application, type Level2Invite, type Level2Review } from "@/types/level2";
+import { level2ReviewToRow, level2ToRow, rowToLevel2, rowToLevel2Review } from "./level2Schema";
 import type { StaffAccount } from "@/types/staff";
 import { classifyError } from "@/lib/http";
 import type { StoreDiagnosis } from "@/lib/repository/types";
@@ -159,6 +159,34 @@ export class SheetsRepository implements ApplicationRepository {
   }
 
   // ── Level 2 (append-only) ──
+  private async level2ReviewRows() {
+    try { return (await this.sheets.read(SHEETS.level2Reviews)).slice(1); }
+    catch (e) { if (classifyError(e) === "SHEET_TAB_MISSING") throw new Error(`The "${SHEETS.level2Reviews}" tab does not exist yet. Run npm run setup:sheets once (it only adds the new tab).`); throw e; }
+  }
+  async getLevel2Reviews(): Promise<Level2Review[]> {
+    return (await this.level2ReviewRows()).map(rowToLevel2Review).filter((r): r is Level2Review => r !== null);
+  }
+  async createLevel2Reviews(list: Level2Review[]) {
+    const live = new Set((await this.getLevel2Reviews()).filter(isLiveL2Review).map((r) => r.level1Code));
+    const fresh = list.filter((r) => { if (live.has(r.level1Code)) return false; live.add(r.level1Code); return true; });
+    if (!fresh.length) return 0;
+    const rows = fresh.map(level2ReviewToRow);
+    if (this.sheets.appendMany) await this.sheets.appendMany(SHEETS.level2Reviews, rows); else for (const r of rows) await this.sheets.append(SHEETS.level2Reviews, r);
+    return fresh.length;
+  }
+  async updateLevel2Reviews(changes: Array<{ reviewId: string; patch: Partial<Level2Review> }>) {
+    const rows = await this.level2ReviewRows(); const index = new Map(rows.map((r, i) => [r[0], i]));
+    const writes: Array<{ rowNumber: number; row: string[] }> = []; const out: Level2Review[] = []; const at = new Date().toISOString();
+    for (const { reviewId, patch } of changes) {
+      const i = index.get(reviewId); if (i === undefined) continue;
+      const cur = rowToLevel2Review(rows[i]); if (!cur) continue;
+      const next: Level2Review = { ...cur, ...patch, reviewId: cur.reviewId, level1Code: cur.level1Code, reviewerEmail: cur.reviewerEmail, updatedAt: patch.updatedAt ?? at };
+      rows[i] = level2ReviewToRow(next); writes.push({ rowNumber: i + 2, row: rows[i] }); out.push(next);
+    }
+    if (!writes.length) return out;
+    if (this.sheets.updateRows) await this.sheets.updateRows(SHEETS.level2Reviews, writes); else for (const w of writes) await this.sheets.updateRow(SHEETS.level2Reviews, w.rowNumber, w.row);
+    return out;
+  }
   async getConfiguration(): Promise<ConfigRow[]> {
     return (await this.optionalRows(SHEETS.configuration)).filter((r) => r[0]).map((r) => ({ key: r[0].trim(), value: unguardText(r[1] ?? ""), updatedAt: r[2] ?? "", updatedBy: unguardText(r[3] ?? "") }));
   }

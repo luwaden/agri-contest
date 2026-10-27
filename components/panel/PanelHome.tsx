@@ -5,6 +5,8 @@ import { DEFAULT_CRITERIA, SCORE_BANDS } from "@/config/scoring";
 import { roleLabel } from "@/lib/auth/permissions";
 import { myWork } from "@/lib/services/reviewService";
 import { passState } from "@/lib/services/screeningService";
+import { myLevel2Reviews } from "@/lib/services/level2ReviewService";
+import Link from "next/link";
 import type { SessionUser } from "@/types/user";
 
 /** Home of the judge and reviewer portals: progress, the filterable list of applications assigned to them, and the rubric. */
@@ -16,8 +18,17 @@ export async function PanelHome({ user }: { user: SessionUser }) {
   const pct = live ? Math.round((done / live) * 100) : 0;
   const base = user.role === "JUDGE" ? "/judge" : "/review";
   const ps = await passState(user);
+  const l2 = await myLevel2Reviews(user).catch(() => []);   // no Level 2 Reviews tab yet = nothing to show
+  const l2Left = l2.filter((x) => x.review.status !== "SUBMITTED").length;
   return (
     <PanelShell user={user}>
+      {l2.length > 0 && (
+        <Link href="/review/level-2" className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-primary/30 bg-white px-5 py-4 hover:border-primary">
+          <span><span className="block font-semibold text-forest-900">Level 2 reviews</span>
+            <span className="block text-sm text-ink-soft">{l2Left ? `${l2Left} of ${l2.length} still to review` : `All ${l2.length} reviewed. Thank you.`}</span></span>
+          <span className="text-sm font-semibold text-primary" aria-hidden="true">Open →</span>
+        </Link>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">{roleLabel(user.role)} portal</p>

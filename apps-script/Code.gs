@@ -241,6 +241,25 @@ var TABS = {
     "invited_at",
     "invited_by",
     "note"
+  ],
+  "Level 2 Reviews": [
+    "review_id",
+    "level1_code",
+    "reviewer_email",
+    "reviewer_name",
+    "status",
+    "assigned_at",
+    "assigned_by",
+    "score_operating",
+    "score_documents",
+    "score_needs",
+    "score_growth",
+    "score_reach",
+    "total",
+    "decision",
+    "comment",
+    "updated_at",
+    "submitted_at"
   ]
 };
 

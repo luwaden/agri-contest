@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FeatureOffNotice } from "@/components/admin/FeatureOffNotice";
 import { PortalShell } from "@/components/admin/PortalShell";
 import { Level2Admin } from "@/components/admin/level2/Level2Admin";
@@ -22,8 +23,11 @@ export default async function Level2AdminPage() {
   return (
     <PortalShell>
       <div className="mx-auto max-w-5xl space-y-6">
-        <div><h1 className="font-display text-3xl font-extrabold">Level 2 application</h1>
-          <p className="mt-1 text-sm text-ink-soft">A hidden form for invited Level 1 applicants. Answers go to the “Level 2 Applications” tab.</p></div>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div><h1 className="font-display text-3xl font-extrabold">Level 2 application</h1>
+            <p className="mt-1 text-sm text-ink-soft">A hidden form for invited Level 1 applicants. Answers go to the “Level 2 Applications” tab.</p></div>
+          {can(user.role, "judges:manage") && <Link href="/admin/level-2/reviews" className="inline-flex min-h-[40px] items-center rounded-full bg-primary px-5 text-sm font-semibold text-white hover:bg-primary/90">Assign reviewers →</Link>}
+        </div>
         <FeatureOffNotice keys={["level2Form", "level2Uploads"]} settingsLink={can(user.role, "config:manage")} />
         <Level2Admin data={data} link={link} mayInvite={can(user.role, "applications:status")} mayExport={can(user.role, "export:data")} />
       </div>

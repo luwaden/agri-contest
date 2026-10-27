@@ -5,14 +5,13 @@ import { Fragment } from "react";
 import { PortalShell } from "@/components/admin/PortalShell";
 import { requirePagePermission } from "@/lib/auth/server";
 import { level2Documents, level2Submission } from "@/lib/services/level2Service";
-import { L2_AGE, L2_CROPS, L2_DISABILITY, L2_EDUCATION, L2_GENDER, L2_NEEDS, L2_REGISTRATION, L2_SETTING, YES_NO } from "@/config/level2";
+import { l2AnswerSections } from "@/lib/level2/present";
+import { reviewFor } from "@/lib/services/level2ReviewService";
+import { L2_DECISIONS, L2_MAX_TOTAL, L2_REVIEW_QUESTIONS, L2_SCALE } from "@/config/level2Review";
 
 export const metadata: Metadata = { title: "Level 2 submission", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-type Opt = ReadonlyArray<{ value: string; label: string }>;
-const label = (list: Opt, v: string) => list.find((o) => o.value === v)?.label ?? v;
-const yn = (v: string) => label(YES_NO, v);
 
 function Section({ title, rows }: { title: string; rows: Array<[string, React.ReactNode]> }) {
   return (
@@ -32,6 +31,7 @@ export default async function Level2Submission({ params }: { params: Promise<{ c
   const s = await level2Submission(decodeURIComponent(code));
   if (!s) notFound();
   const docs = level2Documents(s);
+  const review = await reviewFor(s.level1Code).catch(() => null);   // no Level 2 Reviews tab yet: shown as "no reviewer"
   const received = new Date(s.submittedAt).toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
@@ -68,26 +68,17 @@ export default async function Level2Submission({ params }: { params: Promise<{ c
           <p className="border-t border-paper-line px-5 py-3 text-xs text-ink-muted">Uploaded files open only for signed-in staff, and each opening is recorded in the activity log. Pasted links open the applicant's own sharing link.</p>
         </section>
 
-        <Section title="The business and its owner" rows={[
-          ["Business name", s.businessName], ["Year of establishment", s.yearEstablished], ["Contact person (Founder/CEO)", s.contactName],
-          ["Telephone", s.phone], ["Email (on this form)", s.email], ["Email (Level 1)", s.level1Email],
-          ["State", s.state], ["LGA", s.lga], ["Community / village / ward", s.community], ["Rural or urban", label(L2_SETTING, s.setting)],
-          ["Gender of owner", label(L2_GENDER, s.ownerGender)], ["Age of owner", label(L2_AGE, s.ownerAge)],
-          ["Disability", label(L2_DISABILITY, s.disability)], ["Highest education", label(L2_EDUCATION, s.ownerEducation)],
-        ]} />
-        <Section title="Operations" rows={[
-          ["Crop type", s.cropType === "OTHER" ? `Other: ${s.cropTypeOther}` : label(L2_CROPS, s.cropType)],
-          ["Has a CAC certificate", yn(s.hasCac)],
-          ["Type of registration", s.registrationType === "OTHER" ? `Other: ${s.registrationTypeOther}` : label(L2_REGISTRATION, s.registrationType)],
-          ["Permanent employees", s.permanentEmployees], ["Casual employees", s.casualEmployees], ["Farmers served a year (approx.)", s.farmersServed],
-          ["Trained on input distribution", yn(s.trainedInputDistribution)],
-          ["Belongs to an association", s.inAssociation === "YES" && s.associationName ? `Yes: ${s.associationName}` : yn(s.inAssociation)],
-          ["Support from AGRA-funded projects", yn(s.agraSupport)], ["Business bank account", yn(s.hasBusinessBankAccount)],
-        ]} />
-        <Section title="Support the SME needs" rows={[
-          ...L2_NEEDS.map(([k, q]): [string, string] => [q.replace(/^Does the SME need support with /, "").replace(/\?$/, "").replace(/^./, (c) => c.toUpperCase()), yn(s[k])]),
-          ["Other needs", s.hasOtherNeeds === "YES" ? s.otherNeeds || "Yes" : yn(s.hasOtherNeeds)],
-        ]} />
+        {review ? (
+          <Section title="Review" rows={[
+            ["Reviewer", review.reviewerName || review.reviewerEmail],
+            ["Status", { ASSIGNED: "Not started", IN_PROGRESS: "Draft saved", SUBMITTED: `Submitted ${review.submittedAt ? new Date(review.submittedAt).toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`, WITHDRAWN: "Withdrawn" }[review.status]],
+            ...L2_REVIEW_QUESTIONS.map((q): [string, string] => [q.label, review.scores[q.id] ? `${review.scores[q.id]} · ${L2_SCALE[review.scores[q.id]]}` : ""]),
+            ["Total", review.total == null ? "" : `${review.total} / ${L2_MAX_TOTAL}`],
+            ["Decision", review.decision ? L2_DECISIONS.find((d) => d.value === review.decision)!.label : ""],
+            ["Comment", review.comment],
+          ]} />
+        ) : <p className="rounded-lg border border-dashed border-paper-line bg-white px-5 py-4 text-sm text-ink-muted">No reviewer yet. Assign one in <Link href="/admin/level-2/reviews" className="font-semibold text-primary hover:underline">Level 2 reviews</Link>.</p>}
+        {l2AnswerSections(s).map((sec) => <Section key={sec.title} title={sec.title} rows={sec.rows} />)}
       </div>
     </PortalShell>
   );

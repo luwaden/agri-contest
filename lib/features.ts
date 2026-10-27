@@ -60,6 +60,7 @@ export const OFF_MESSAGE: Record<FeatureKey, string> = {
   publicAssistant: "The assistant is available to programme staff only. Please sign in.",
   confirmationEmails: "Confirmation emails are switched off.",
   panelScoring: "Scoring is closed at the moment, so nothing can be saved. Your work so far is kept. Contact the programme team if you need to make a change.",
+  level2Scoring: "Level 2 reviews are closed at the moment, so nothing can be saved. Your work so far is kept.",
   messages: "Sending messages is switched off in Admin → Settings.",
   aiAssistant: "The AI assistant is switched off in Admin → Settings.",
   aiDataDesk: "The AI data desk is switched off in Admin → Settings.",
