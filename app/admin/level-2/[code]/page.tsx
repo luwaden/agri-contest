@@ -7,7 +7,8 @@ import { requirePagePermission } from "@/lib/auth/server";
 import { level2Documents, level2Submission } from "@/lib/services/level2Service";
 import { l2AnswerSections } from "@/lib/level2/present";
 import { reviewFor } from "@/lib/services/level2ReviewService";
-import { L2_DECISIONS, L2_MAX_TOTAL, L2_REVIEW_QUESTIONS, L2_SCALE } from "@/config/level2Review";
+import { L2_CRITERIA, L2_DECISIONS, L2_LEGACY_MAX, L2_MAX_MARKS } from "@/config/level2Review";
+import { isLegacyL2Review } from "@/types/level2";
 
 export const metadata: Metadata = { title: "Level 2 submission", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -72,10 +73,11 @@ export default async function Level2Submission({ params }: { params: Promise<{ c
           <Section title="Review" rows={[
             ["Reviewer", review.reviewerName || review.reviewerEmail],
             ["Status", { ASSIGNED: "Not started", IN_PROGRESS: "Draft saved", SUBMITTED: `Submitted ${review.submittedAt ? new Date(review.submittedAt).toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`, WITHDRAWN: "Withdrawn" }[review.status]],
-            ...L2_REVIEW_QUESTIONS.map((q): [string, string] => [q.label, review.scores[q.id] ? `${review.scores[q.id]} · ${L2_SCALE[review.scores[q.id]]}` : ""]),
-            ["Total", review.total == null ? "" : `${review.total} / ${L2_MAX_TOTAL}`],
+            ...L2_CRITERIA.map((c): [string, string] => [c.label, Number.isInteger(review.scores[c.id]) ? `${review.scores[c.id]} / ${c.max}` : ""]),
+            ["Score", review.percent == null ? (isLegacyL2Review(review) ? `${review.legacy!.total} / ${L2_LEGACY_MAX} on the earlier form (not marked on the current sheet yet)` : "") : `${review.percent}%  (${review.total} / ${L2_MAX_MARKS} marks)`],
             ["Decision", review.decision ? L2_DECISIONS.find((d) => d.value === review.decision)!.label : ""],
             ["Comment", review.comment],
+            ...(review.topRank != null ? [[`Reviewer's top 3`, `Number ${review.topRank}. ${review.topReason}`] as [string, string]] : []),
           ]} />
         ) : <p className="rounded-lg border border-dashed border-paper-line bg-white px-5 py-4 text-sm text-ink-muted">No reviewer yet. Assign one in <Link href="/admin/level-2/reviews" className="font-semibold text-primary hover:underline">Level 2 reviews</Link>.</p>}
         {l2AnswerSections(s).map((sec) => <Section key={sec.title} title={sec.title} rows={sec.rows} />)}

@@ -259,7 +259,20 @@ var TABS = {
     "decision",
     "comment",
     "updated_at",
-    "submitted_at"
+    "submitted_at",
+    "mark_doc_proposal",
+    "mark_doc_cac",
+    "mark_doc_smedan",
+    "mark_doc_bank",
+    "mark_registration",
+    "mark_bank_account",
+    "mark_scalability",
+    "mark_planning",
+    "mark_uniqueness",
+    "marks_total",
+    "percent",
+    "top_rank",
+    "top_reason"
   ]
 };
 

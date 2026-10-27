@@ -103,7 +103,7 @@ export class LocalRepository implements ApplicationRepository {
   getEmailCampaigns = () => serial(async () => (await load()).campaigns ?? []);
   getEmailLog = () => serial(async () => (await load()).emailLog ?? []);
   appendEmailLog = (rows: EmailLogRow[]) => serial(async () => { const s = await load(); (s.emailLog ??= []).push(...rows); await save(s); });
-  getLevel2Reviews = () => serial(async () => (await load()).level2Reviews ?? []);
+  getLevel2Reviews = () => serial(async () => ((await load()).level2Reviews ?? []).map((r): Level2Review => ({ ...r, percent: r.percent ?? null, topRank: r.topRank ?? null, topReason: r.topReason ?? "", legacy: r.legacy ?? null })));   // rows saved before the current marking sheet
   createLevel2Reviews = (rows: Level2Review[]) => serial(async () => {
     const s = await load(); s.level2Reviews ??= [];
     const live = new Set(s.level2Reviews.filter(isLiveL2Review).map((r) => r.level1Code)); let n = 0;

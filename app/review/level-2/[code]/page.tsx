@@ -6,7 +6,8 @@ import { requirePagePermission } from "@/lib/auth/server";
 import { homeFor } from "@/lib/auth/permissions";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { Level2ReviewForm } from "@/components/panel/Level2ReviewForm";
-import { myLevel2Reviews } from "@/lib/services/level2ReviewService";
+import { missingDocCriteria, myLevel2Reviews } from "@/lib/services/level2ReviewService";
+import { isLegacyL2Review } from "@/types/level2";
 import { level2Documents } from "@/lib/services/level2Service";
 import { l2AnswerSectionsForReviewer, l2Facts } from "@/lib/level2/present";
 import { featureOn } from "@/lib/features";
@@ -23,7 +24,7 @@ export default async function ReviewLevel2({ params }: { params: Promise<{ code:
   const mine = all.find((x) => x.submission.level1Code === code);
   if (!mine) notFound();   // not assigned to this reviewer: same answer as "does not exist"
   const { submission: s, review: r } = mine;
-  const next = all.find((x) => x.review.status !== "SUBMITTED" && x.submission.level1Code !== code);
+  const next = all.find((x) => (x.review.status !== "SUBMITTED" || isLegacyL2Review(x.review)) && x.submission.level1Code !== code);
   const docs = level2Documents(s).filter((d) => d.status !== "missing");
   const open = await featureOn("level2Scoring");
   const card = "rounded-lg border border-paper-line bg-white";
@@ -70,7 +71,8 @@ export default async function ReviewLevel2({ params }: { params: Promise<{ code:
           ))}
         </details>
 
-        <Level2ReviewForm code={s.level1Code} initial={{ scores: r.scores, decision: r.decision, comment: r.comment, status: r.status, total: r.total }} open={open}
+        <Level2ReviewForm code={s.level1Code} open={open} missingDocs={[...missingDocCriteria(s)]}
+          initial={{ scores: r.scores, decision: r.decision, comment: r.comment, status: isLegacyL2Review(r) ? "IN_PROGRESS" : r.status, total: r.total, percent: r.percent, legacyTotal: r.legacy?.total ?? null }}
           nextHref={next ? `/review/level-2/${next.submission.level1Code}` : null} />
       </div>
     </PanelShell>

@@ -19,14 +19,24 @@ export interface Level2Review {
   status: Level2ReviewStatus;
   assignedAt: string;
   assignedBy: string;
-  /** question id → 1..5. Missing = not answered yet. */
+  /** criterion id (config/level2Review.ts) → 0..max. Missing = not marked yet. */
   scores: Record<string, number>;
-  /** Out of 25, set when submitted. */
+  /** Marks out of L2_MAX_MARKS, set once every criterion is marked. */
   total: number | null;
+  /** total as a whole-number percentage. */
+  percent: number | null;
   decision: "RECOMMEND" | "NOT_RECOMMEND" | null;
   comment: string;
   updatedAt: string;
   submittedAt: string | null;
+  /** 1, 2 or 3 when the reviewer picked this applicant as one of their top 3. */
+  topRank: number | null;
+  /** The reviewer's reason for the top-3 pick. */
+  topReason: string;
+  /** Scores from the first (5-question, out of 25) form, kept as they were. null when the row never used it. */
+  legacy: { scores: Record<string, number>; total: number | null } | null;
 }
 /** Withdrawn rows are kept for the record but no longer count. */
 export const isLiveL2Review = (r: Level2Review) => r.status !== "WITHDRAWN";
+/** Submitted on the first form and not marked again since: shown as "earlier form", reopen to mark with the current sheet. */
+export const isLegacyL2Review = (r: Level2Review) => r.status === "SUBMITTED" && r.total === null && r.legacy?.total != null;

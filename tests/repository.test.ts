@@ -104,11 +104,11 @@ async function contract(name: string, repo: ApplicationRepository) {
   await repo.appendEmailLog([{ at: "2026-10-19T10:01:00Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA2", email: "k@example.com", status: "SENT", detail: "em_1" }, { at: "2026-10-19T10:01:01Z", campaignId: "MSG-1", applicationId: "AGRA-2026-AAAAA3", email: "l@example.com", status: "FAILED", detail: "-TIMEOUT" }]);
   const lg = await repo.getEmailLog(); assert.equal(lg.length, 2); assert.equal(lg[1].detail, "-TIMEOUT", `${name}: log round trip (guarded text)`);
   // Level 2 reviews: one live review per code; updates by id
-  const l2r = { reviewId: "L2R-A", level1Code: "AGRA-2026-AAAAA2", reviewerEmail: "r@example.org", reviewerName: "=Rev", status: "ASSIGNED" as const, assignedAt: "2026-10-27T09:00:00Z", assignedBy: "a@example.org", scores: {}, total: null, decision: null, comment: "", updatedAt: "2026-10-27T09:00:00Z", submittedAt: null };
+  const l2r = { reviewId: "L2R-A", level1Code: "AGRA-2026-AAAAA2", reviewerEmail: "r@example.org", reviewerName: "=Rev", status: "ASSIGNED" as const, assignedAt: "2026-10-27T09:00:00Z", assignedBy: "a@example.org", scores: {}, total: null, percent: null, decision: null, comment: "", updatedAt: "2026-10-27T09:00:00Z", submittedAt: null, topRank: null, topReason: "", legacy: null };
   assert.equal(await repo.createLevel2Reviews([l2r, { ...l2r, reviewId: "L2R-B" }]), 1, `${name}: one live review per code`);
-  const [l2upd] = await repo.updateLevel2Reviews([{ reviewId: "L2R-A", patch: { status: "SUBMITTED", scores: { operating: 5, reach: 2 }, total: 20, decision: "RECOMMEND", comment: "-Good", submittedAt: "2026-10-27T10:00:00Z" } }]);
+  const [l2upd] = await repo.updateLevel2Reviews([{ reviewId: "L2R-A", patch: { status: "SUBMITTED", scores: { scalability: 5, uniqueness: 2 }, total: 20, decision: "RECOMMEND", comment: "-Good", submittedAt: "2026-10-27T10:00:00Z" } }]);
   assert.equal(l2upd.total, 20);
-  assert.deepEqual((await repo.getLevel2Reviews()).map((r) => [r.reviewId, r.status, r.scores.operating, r.comment, r.reviewerName]), [["L2R-A", "SUBMITTED", 5, "-Good", "=Rev"]], `${name}: Level 2 review round trip`);
+  assert.deepEqual((await repo.getLevel2Reviews()).map((r) => [r.reviewId, r.status, r.scores.scalability, r.comment, r.reviewerName]), [["L2R-A", "SUBMITTED", 5, "-Good", "=Rev"]], `${name}: Level 2 review round trip`);
   // Settings (Configuration tab; append-only)
   await repo.appendConfiguration({ key: "feature.mentorForm", value: "off", updatedAt: "2026-10-26T10:00:00Z", updatedBy: "=admin@example.org" });
   assert.deepEqual(await repo.getConfiguration(), [{ key: "feature.mentorForm", value: "off", updatedAt: "2026-10-26T10:00:00Z", updatedBy: "=admin@example.org" }], `${name}: configuration round trip`);

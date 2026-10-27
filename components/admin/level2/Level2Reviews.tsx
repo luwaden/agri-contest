@@ -5,17 +5,19 @@ import { useRouter } from "next/navigation";
 
 type Status = "ASSIGNED" | "IN_PROGRESS" | "SUBMITTED" | "WITHDRAWN";
 type Row = { code: string; businessName: string; state: string; contactName: string; submittedAt: string;
-  review: { reviewId: string; reviewerEmail: string; reviewerName: string; status: Status; total: number | null; decision: "RECOMMEND" | "NOT_RECOMMEND" | null; updatedAt: string } | null };
+  review: { reviewId: string; reviewerEmail: string; reviewerName: string; status: Status; total: number | null; percent: number | null; decision: "RECOMMEND" | "NOT_RECOMMEND" | null;
+    topRank: number | null; legacyTotal: number | null; updatedAt: string } | null };
 type Reviewer = { email: string; name: string; role: string; assigned: number; done: number };
-type Data = { rows: Row[]; reviewers: Reviewer[]; maxTotal: number; stats: { submitted: number; assigned: number; reviewed: number; recommended: number } };
+type Data = { rows: Row[]; reviewers: Reviewer[]; maxTotal: number; legacyMax: number; stats: { submitted: number; assigned: number; reviewed: number; recommended: number } };
 type Preview = { total: number; perReviewer: Array<{ email: string; name: string; adding: number; alreadyHas: number }> };
 
 const FILTERS = [
-  ["all", "All"], ["none", "No reviewer"], ["ASSIGNED", "Not started"], ["IN_PROGRESS", "Draft"], ["SUBMITTED", "Reviewed"], ["RECOMMEND", "Recommended"],
+  ["all", "All"], ["none", "No reviewer"], ["ASSIGNED", "Not started"], ["IN_PROGRESS", "Draft"], ["SUBMITTED", "Reviewed"], ["RECOMMEND", "Recommended"], ["TOP", "Top 3 picks"],
 ] as const;
 type Filter = (typeof FILTERS)[number][0];
 const STATUS_LABEL: Record<Status, string> = { ASSIGNED: "Not started", IN_PROGRESS: "Draft", SUBMITTED: "Reviewed", WITHDRAWN: "Withdrawn" };
-const match = (r: Row, f: Filter) => f === "all" || (f === "none" ? !r.review : f === "RECOMMEND" ? r.review?.decision === "RECOMMEND" && r.review.status === "SUBMITTED" : r.review?.status === f);
+const match = (r: Row, f: Filter) => f === "all" || (f === "none" ? !r.review : f === "RECOMMEND" ? r.review?.decision === "RECOMMEND" && r.review.status === "SUBMITTED"
+  : f === "TOP" ? r.review?.topRank != null : r.review?.status === f);
 
 async function post<T>(body: Record<string, unknown>): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   try {
@@ -147,7 +149,11 @@ export function Level2Reviews({ data, mayExport }: { data: Data; mayExport: bool
                     <td className="px-3 py-2">{r.state}</td>
                     <td className="px-3 py-2">{r.review ? (r.review.reviewerName || r.review.reviewerEmail) : <span className="text-ink-muted">—</span>}</td>
                     <td className="px-3 py-2">{r.review ? <span className={r.review.status === "SUBMITTED" ? "font-semibold text-primary" : "text-ink-soft"}>{STATUS_LABEL[r.review.status]}</span> : <span className="text-ink-muted">No reviewer</span>}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.review?.total != null ? `${r.review.total}/${data.maxTotal}` : ""}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {r.review?.status === "SUBMITTED" && r.review.percent != null ? <span className="font-semibold">{r.review.percent}%</span>
+                        : r.review?.legacyTotal != null ? <span className="text-ink-muted" title="Marked on the earlier form. Reopen so the reviewer can mark it on the current sheet.">{r.review.legacyTotal}/{data.legacyMax} · earlier form</span> : ""}
+                      {r.review?.topRank != null && <span className="ml-2 rounded-full border border-primary/40 px-2 py-0.5 text-xs font-semibold text-primary">Top {r.review.topRank}</span>}
+                    </td>
                     <td className="px-3 py-2">{r.review?.status === "SUBMITTED" ? (r.review.decision === "RECOMMEND" ? "Recommend" : "Do not recommend") : ""}</td>
                     <td className="px-5 py-2 text-right">{r.review?.status === "SUBMITTED" && (
                       <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Reopen the review of ${r.businessName}? The reviewer can then change it and must submit again.`)) run({ action: "reopen", code: r.code }, () => "Reopened. The reviewer can change it now."); }} className="text-sm font-semibold text-primary hover:underline">Reopen</button>)}</td>

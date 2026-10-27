@@ -4,9 +4,10 @@ import { getRepository } from "@/lib/repository";
 import { loadStaff } from "@/lib/auth/users";
 import { csvCell } from "@/lib/csv";
 import { OFF_MESSAGE, featureOn } from "@/lib/features";
-import { L2_DECISIONS, L2_MAX_TOTAL, L2_QUESTION_IDS, L2_REVIEW_QUESTIONS } from "@/config/level2Review";
+import { L2_CRITERIA, L2_CRITERION_IDS, L2_DECISIONS, L2_LEGACY_MAX, L2_MAX_MARKS, L2_TOP_PICKS, l2Percent } from "@/config/level2Review";
 import { L2_DOC_FIELDS } from "@/lib/validation/level2";
-import { isLiveL2Review, type Level2Application, type Level2Review } from "@/types/level2";
+import { isLegacyL2Review, isLiveL2Review, type Level2Application, type Level2Review } from "@/types/level2";
+import { level2Documents } from "./level2Service";
 import type { SessionUser } from "@/types/user";
 import type { ServiceResult } from "./applicationService";
 
@@ -14,7 +15,8 @@ import type { ServiceResult } from "./applicationService";
  * LEVEL 2 REVIEW
  *
  *   admin: share unassigned Level 2 applicants evenly between chosen reviewers (preview → confirm), then move single ones
- *   reviewer: sees only their own applicants; answers 5 questions (1–5), Recommend / Do not recommend, short comment
+ *   reviewer: sees only their own applicants; marks the sheet in config/level2Review.ts (out of 80, shown as %),
+ *             Recommend / Do not recommend, short comment; then picks a top 3 with a reason for each
  *
  * One live review per applicant. Moving withdraws the old row (kept for the record) and adds a new one.
  * A submitted review never moves; an administrator can reopen it.
@@ -44,11 +46,12 @@ export async function level2ReviewOverview() {
   const rows = [...subs].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)).map((s) => {
     const r = live.get(s.level1Code);
     return { code: s.level1Code, businessName: s.businessName, state: s.state, contactName: s.contactName, submittedAt: s.submittedAt,
-      review: r ? { reviewId: r.reviewId, reviewerEmail: r.reviewerEmail, reviewerName: r.reviewerName, status: r.status, total: r.total, decision: r.decision, updatedAt: r.updatedAt } : null };
+      review: r ? { reviewId: r.reviewId, reviewerEmail: r.reviewerEmail, reviewerName: r.reviewerName, status: r.status, total: r.total, percent: r.percent, decision: r.decision,
+        topRank: r.topRank, legacyTotal: isLegacyL2Review(r) ? r.legacy!.total : null, updatedAt: r.updatedAt } : null };
   });
   const reviewed = rows.filter((r) => r.review?.status === "SUBMITTED");
   return {
-    rows, reviewers, maxTotal: L2_MAX_TOTAL,
+    rows, reviewers, maxTotal: L2_MAX_MARKS, legacyMax: L2_LEGACY_MAX,
     stats: { submitted: rows.length, assigned: rows.filter((r) => r.review).length, reviewed: reviewed.length, recommended: reviewed.filter((r) => r.review!.decision === "RECOMMEND").length },
   };
 }
@@ -98,7 +101,7 @@ export async function confirmShare(input: { reviewers?: unknown; byState?: unkno
 
 const newRow = (code: string, r: Reviewer, actor: string, at: string): Level2Review => ({
   reviewId: newId(), level1Code: code, reviewerEmail: r.email, reviewerName: r.name, status: "ASSIGNED", assignedAt: at, assignedBy: actor,
-  scores: {}, total: null, decision: null, comment: "", updatedAt: at, submittedAt: null,
+  scores: {}, total: null, percent: null, decision: null, comment: "", updatedAt: at, submittedAt: null, topRank: null, topReason: "", legacy: null,
 });
 const codesOf = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((c): c is string => typeof c === "string").map((c) => c.trim().toUpperCase()))].slice(0, 2000) : []);
 
@@ -154,11 +157,28 @@ export async function reviewFor(code: string) { return (await getRepository().ge
 export async function level2ReviewCsv() {
   const { rows } = await level2ReviewOverview();
   const all = new Map((await getRepository().getLevel2Reviews()).filter(isLiveL2Review).map((r) => [r.level1Code, r]));
-  const head = ["level1_code", "business_name", "state", "contact_name", "reviewer", "status", ...L2_REVIEW_QUESTIONS.map((q) => q.label), `total_out_of_${L2_MAX_TOTAL}`, "decision", "comment", "submitted_at"];
+  const head = ["level1_code", "business_name", "state", "contact_name", "reviewer", "status", ...L2_CRITERIA.map((c) => `${c.label} (/${c.max})`),
+    `marks_out_of_${L2_MAX_MARKS}`, "percent", "decision", "comment", "top_3_rank", "top_3_reason", `earlier_form_out_of_${L2_LEGACY_MAX}`, "submitted_at"];
   const lines = [head, ...rows.map((x) => { const r = all.get(x.code); return [x.code, x.businessName, x.state, x.contactName, r?.reviewerName || r?.reviewerEmail || "", r?.status ?? "NOT_ASSIGNED",
-    ...L2_QUESTION_IDS.map((id) => (r?.scores[id] ? String(r.scores[id]) : "")), r?.total == null ? "" : String(r.total),
-    r?.decision ? L2_DECISIONS.find((d) => d.value === r.decision)!.label : "", r?.comment ?? "", r?.submittedAt ?? ""]; })];
-  return { rows: rows.length, csv: "﻿" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n") + "\r\n" };
+    ...L2_CRITERION_IDS.map((id) => (r && Number.isInteger(r.scores[id]) ? String(r.scores[id]) : "")), r?.total == null ? "" : String(r.total), r?.percent == null ? "" : String(r.percent),
+    r?.decision ? L2_DECISIONS.find((d) => d.value === r.decision)!.label : "", r?.comment ?? "", r?.topRank == null ? "" : String(r.topRank), r?.topReason ?? "",
+    r && isLegacyL2Review(r) ? String(r.legacy!.total) : "", r?.submittedAt ?? ""]; })];
+  return { rows: rows.length, csv: "\uFEFF" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n") + "\r\n" };
+}
+
+/** Admin → Level 2: each applicant's result, and every reviewer's top 3 with their reasons. */
+export async function level2Results() {
+  const { subs, live, reviewers } = await load();
+  const byCode = new Map(subs.map((s) => [s.level1Code, s]));
+  const results: Record<string, { percent: number | null; status: Level2Review["status"]; decision: Level2Review["decision"]; reviewerName: string; topRank: number | null; legacy: boolean }> = {};
+  for (const r of live.values()) if (byCode.has(r.level1Code))
+    results[r.level1Code] = { percent: r.status === "SUBMITTED" ? r.percent : null, status: r.status, decision: r.status === "SUBMITTED" ? r.decision : null, reviewerName: r.reviewerName || r.reviewerEmail, topRank: r.topRank, legacy: isLegacyL2Review(r) };
+  const picks = reviewers.filter((p) => p.assigned > 0).map((p) => ({
+    email: p.email, name: p.name, assigned: p.assigned, done: p.done,
+    top: [...live.values()].filter((r) => r.reviewerEmail === p.email && r.topRank !== null && byCode.has(r.level1Code)).sort((a, b) => a.topRank! - b.topRank!)
+      .map((r) => ({ rank: r.topRank!, code: r.level1Code, businessName: byCode.get(r.level1Code)!.businessName, state: byCode.get(r.level1Code)!.state, percent: r.percent, decision: r.decision, reason: r.topReason, reopened: r.status !== "SUBMITTED" })),
+  }));
+  return { results, picks, required: L2_TOP_PICKS };
 }
 
 // ───────────── reviewers ─────────────
@@ -182,32 +202,80 @@ export async function myLevel2Review(user: SessionUser, code: string) {
 }
 
 export type ReviewErrors = Record<string, string>;
-/** { scores: {id: 1..5}, decision, comment } saved as a draft, or { …, submit: true } checked and locked. */
+const clean = (v: unknown, max: number) => (typeof v === "string" ? v : "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max);
+
+/** Which "document submitted" criteria have no document: those are always 0. */
+export function missingDocCriteria(s: Level2Application) {
+  const provided = new Set(level2Documents(s).filter((d) => d.status !== "missing").map((d) => d.field));
+  return new Set(L2_CRITERIA.filter((c) => c.doc && !provided.has(c.doc)).map((c) => c.id));
+}
+
+/** { scores: {id: 0..max}, decision, comment } saved as a draft, or { …, submit: true } checked and locked. */
 export async function saveMyLevel2Review(user: SessionUser, code: string, body: Record<string, unknown>): Promise<ServiceResult<{ review: Level2Review }>> {
   if (!(await featureOn("level2Scoring"))) return fail(503, OFF_MESSAGE.level2Scoring, { code: "FEATURE_OFF" });
   const mine = await myLevel2Review(user, code);
   if (!mine) return fail(404, "This applicant is not assigned to you.");
-  if (mine.review.status === "SUBMITTED") return fail(409, "You have already submitted this review. Ask the programme team if it needs to change.");
+  if (mine.review.status === "SUBMITTED" && !isLegacyL2Review(mine.review)) return fail(409, "You have already submitted this review. Ask the programme team if it needs to change.");
   const raw = (body.scores && typeof body.scores === "object" ? body.scores : {}) as Record<string, unknown>;
+  const noDoc = missingDocCriteria(mine.submission);
   const scores: Record<string, number> = {};
-  for (const id of L2_QUESTION_IDS) { const v = Number(raw[id]); if (Number.isInteger(v) && v >= 1 && v <= 5) scores[id] = v; }
+  for (const c of L2_CRITERIA) {
+    if (noDoc.has(c.id)) { scores[c.id] = 0; continue; }   // not submitted = no marks, whatever was sent
+    const v = raw[c.id] === "" || raw[c.id] == null ? NaN : Number(raw[c.id]);
+    if (Number.isInteger(v) && v >= 0 && v <= c.max) scores[c.id] = v;
+  }
   const decision = body.decision === "RECOMMEND" || body.decision === "NOT_RECOMMEND" ? body.decision : null;
-  const comment = (typeof body.comment === "string" ? body.comment : "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, 1000);
+  const comment = clean(body.comment, 1000);
   const submit = body.submit === true;
   if (submit) {
     const errors: ReviewErrors = {};
-    for (const q of L2_REVIEW_QUESTIONS) if (!scores[q.id]) errors[q.id] = "Choose a score from 1 to 5.";
+    for (const c of L2_CRITERIA) if (scores[c.id] === undefined) errors[c.id] = `Give a mark from 0 to ${c.max}.`;
     if (!decision) errors.decision = "Choose Recommend or Do not recommend.";
     if (comment.length < 10) errors.comment = "Write a short reason (a sentence is enough).";
-    if (Object.keys(errors).length) return fail(422, "A few answers are missing.", { errors });
+    if (Object.keys(errors).length) return fail(422, "A few marks are missing.", { errors });
   }
-  const complete = L2_QUESTION_IDS.every((id) => scores[id]);
+  const complete = L2_CRITERION_IDS.every((id) => scores[id] !== undefined);
+  const total = complete ? L2_CRITERION_IDS.reduce((n, id) => n + scores[id], 0) : null;
   const at = now();
   const [review] = await getRepository().updateLevel2Reviews([{ reviewId: mine.review.reviewId, patch: {
-    scores, decision, comment, total: complete ? L2_QUESTION_IDS.reduce((n, id) => n + scores[id], 0) : null,
+    scores, decision, comment, total, percent: total === null ? null : l2Percent(total),
     status: submit ? "SUBMITTED" : "IN_PROGRESS", submittedAt: submit ? at : null, updatedAt: at } }]);
-  if (submit) await getRepository().logEvent({ at, applicationId: mine.review.level1Code, actor: user.email, action: "LEVEL2_REVIEW_SUBMITTED", detail: `${review.total}/${L2_MAX_TOTAL} ${review.decision}` }).catch(() => {});
+  if (submit) await getRepository().logEvent({ at, applicationId: mine.review.level1Code, actor: user.email, action: "LEVEL2_REVIEW_SUBMITTED", detail: `${review.total}/${L2_MAX_MARKS} (${review.percent}%) ${review.decision}` }).catch(() => {});
   return { ok: true, status: 200, data: { review } };
+}
+
+/** How many top picks this reviewer must give: 3, or all of theirs if they have fewer than 3 applicants. */
+export const topPicksNeeded = (assigned: number) => Math.min(L2_TOP_PICKS, assigned);
+
+/** { picks: [{ code, reason }, …] } in rank order (first = best). Only applicants this reviewer has submitted on the current sheet. */
+export async function saveMyTopPicks(user: SessionUser, body: Record<string, unknown>): Promise<ServiceResult<{ saved: number }>> {
+  if (!(await featureOn("level2Scoring"))) return fail(503, OFF_MESSAGE.level2Scoring, { code: "FEATURE_OFF" });
+  const mine = await myLevel2Reviews(user);
+  const need = topPicksNeeded(mine.length);
+  if (!need) return fail(404, "No Level 2 applicants are assigned to you.");
+  const scored = new Map(mine.filter((x) => x.review.status === "SUBMITTED" && x.review.percent !== null).map((x) => [x.submission.level1Code, x]));
+  if (scored.size < need) return fail(422, `Submit at least ${need} review${need === 1 ? "" : "s"} first. You have submitted ${scored.size}.`);
+  const list = Array.isArray(body.picks) ? body.picks.slice(0, L2_TOP_PICKS) : [];
+  const errors: ReviewErrors = {};
+  const picks: Array<{ code: string; reason: string }> = [];
+  for (let i = 0; i < need; i++) {
+    const p = (list[i] && typeof list[i] === "object" ? list[i] : {}) as Record<string, unknown>;
+    const code = clean(p.code, 40).toUpperCase(), reason = clean(p.reason, 500);
+    if (!code) errors[`pick${i}`] = "Choose an applicant.";
+    else if (!scored.has(code)) errors[`pick${i}`] = "Choose one of the applicants you have submitted.";
+    else if (picks.some((x) => x.code === code)) errors[`pick${i}`] = "This applicant is already in your top 3.";
+    if (reason.length < 10) errors[`reason${i}`] = "Say in a sentence why this applicant is in your top 3.";
+    picks.push({ code, reason });
+  }
+  if (Object.keys(errors).length) return fail(422, "A few answers are missing.", { errors });
+  const rankOf = new Map(picks.map((p, i) => [p.code, { rank: i + 1, reason: p.reason }]));
+  const changes = mine.flatMap(({ review: r }) => {
+    const want = rankOf.get(r.level1Code) ?? { rank: null, reason: "" };
+    return want.rank === r.topRank && want.reason === r.topReason ? [] : [{ reviewId: r.reviewId, patch: { topRank: want.rank, topReason: want.reason, updatedAt: r.updatedAt } }];
+  });
+  if (changes.length) await getRepository().updateLevel2Reviews(changes);
+  await getRepository().logEvent({ at: now(), applicationId: "-", actor: user.email, action: "LEVEL2_TOP_PICKS", detail: picks.map((p, i) => `${i + 1}. ${p.code}`).join(", ") }).catch(() => {});
+  return { ok: true, status: 200, data: { saved: picks.length } };
 }
 
 /** May this reviewer open this file? Only files of Level 2 applicants assigned to them. */

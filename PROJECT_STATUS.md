@@ -57,6 +57,11 @@
    - follow-up questions only when needed; ≥1 supporting document; CAC upload if CAC = YES; uploads go to `programme/level-2/<code>`;
    - optional `LEVEL2_CLOSE_DATE`; confirmation email on submit. More questions are "still to come": append them at the END of `LEVEL2_COLUMNS`.
 
+## 3b. Level 2 marking sheet + top 3 (agri-update-18.zip, version 2026.10.27.3) [VERIFIED by tests, build and a local browser run; NOT run against the live sheet]
+- Reviewers mark each Level 2 applicant in `config/level2Review.ts` (`L2_CRITERIA`): 4 compulsory documents x 5 (proposal/pitch deck/EOP, CAC, SMEDAN, bank proof), verified registration 10, verified bank account 10, scalability 10, business planning 10, uniqueness 20 = 80 marks, shown as a whole-number %. A document the applicant did not provide is fixed at 0 (server-enforced). Decision + comment kept.
+- Each reviewer picks a ranked top 3 (`/review/level-2/top-3`) from their own submitted reviews, with a reason each (`PUT /api/panel/level-2/top-picks`). Shown on Admin -> Level 2 (per reviewer, plus a Score column and "Highest score" sort), the reviews table (filter "Top 3 picks"), the detail page and the CSV.
+- "Level 2 Reviews" tab: new columns APPENDED after `submitted_at`: `mark_*` (9), `marks_total`, `percent`, `top_rank`, `top_reason`. Old `score_*`/`total` columns are kept and still read (earlier 5-question form); a review submitted on that form shows "earlier form" and the reviewer can mark it again without a reopen. Run `npm run setup:sheets` once.
+
 ## 4. Roles
 ADMIN: everything (incl. Messages `email:send`, AI data desk `ai:data`). COORDINATOR: everything except staff, settings, Messages and the AI desk. JUDGE / REVIEWER: only their assigned work. Applicants and panel applicants have no accounts.
 
